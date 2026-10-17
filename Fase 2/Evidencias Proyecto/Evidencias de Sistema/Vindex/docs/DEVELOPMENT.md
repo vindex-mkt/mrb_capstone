@@ -17,7 +17,7 @@ npm install
 
 Copiar:
 
-.env.example
+.env.local
 
 a:
 

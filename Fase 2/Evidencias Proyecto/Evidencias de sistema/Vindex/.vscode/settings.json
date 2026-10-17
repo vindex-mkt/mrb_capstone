@@ -4,5 +4,9 @@
   // como "Unknown at rule" (falsos positivos). Tailwind los procesa
   // correctamente en el build (PostCSS), así que se ignoran aquí.
   "css.lint.unknownAtRules": "ignore",
-  "scss.lint.unknownAtRules": "ignore"
+  "scss.lint.unknownAtRules": "ignore",
+  "chat.tools.terminal.autoApprove": {
+    "npm run check-types": true,
+    "npx eslint": true
+  }
 }

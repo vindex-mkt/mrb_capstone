@@ -1,28 +1,9 @@
 import ProductCard from "@/components/ProductCard";
-import { IconChevronDown, IconSliders } from "@/components/icons";
+import { formatProductPrice, getActiveDiscountPrice, getAllPublishedProducts, getDiscountLabel, getProductImage } from "@/lib/supabase/queries";
 
-interface CatalogProduct {
-  id: number;
-  name: string;
-  price: string;
-  image: string;
-  seller?: string;
-  previousPrice?: string;
-  discount?: string;
-}
+export default async function AllProducts() {
+	const products = await getAllPublishedProducts();
 
-const products: CatalogProduct[] = [
-  { id: 1, name: "Teclado mecánico RGB", price: "$45.990", seller: "Retro Store", image: "https://picsum.photos/seed/vx-todo-1/600/600" },
-  { id: 2, name: "Zapatillas urbanas", price: "$62.990", seller: "Vintage Chile", discount: "-15%", image: "https://picsum.photos/seed/vx-todo-2/600/600" },
-  { id: 3, name: "Reloj clásico de cuarzo", price: "$58.990", seller: "Coleccionistas", image: "https://picsum.photos/seed/vx-todo-3/600/600" },
-  { id: 4, name: "Mochila impermeable 25L", price: "$32.990", seller: "Arte & Diseño", image: "https://picsum.photos/seed/vx-todo-4/600/600" },
-  { id: 5, name: "Lámpara de escritorio LED", price: "$27.990", seller: "Retro Store", discount: "-10%", image: "https://picsum.photos/seed/vx-todo-5/600/600" },
-  { id: 6, name: "Cafetera italiana 6 tazas", price: "$39.990", seller: "Vintage Chile", previousPrice: "$59.990", image: "https://picsum.photos/seed/vx-todo-6/600/600" },
-  { id: 7, name: "Set de pinceles profesionales", price: "$21.990", seller: "Arte & Diseño", image: "https://picsum.photos/seed/vx-todo-7/600/600" },
-  { id: 8, name: "Parlante bluetooth portátil", price: "$49.990", seller: "Coleccionistas", image: "https://picsum.photos/seed/vx-todo-8/600/600" },
-];
-
-export default function AllProducts() {
   return (
     <section className="py-12">
       <div className="container-site">
@@ -30,20 +11,7 @@ export default function AllProducts() {
           <div>
             <p className="eyebrow">Explora</p>
             <h2 className="section-title mt-1">Todas las publicaciones</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {products.length} productos disponibles para ti
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button type="button" className="btn btn-outline h-10">
-              <IconSliders className="h-4 w-4" />
-              Filtrar
-            </button>
-            <button type="button" className="btn btn-outline hidden h-10 px-4 sm:inline-flex">
-              Relevancia
-              <IconChevronDown className="h-4 w-4" />
-            </button>
+            <p className="mt-2 text-sm text-muted-foreground">{products.length} productos disponibles para ti</p>
           </div>
         </div>
 
@@ -51,15 +19,20 @@ export default function AllProducts() {
           {products.map((product) => (
             <ProductCard
               key={product.id}
-              name={product.name}
-              price={product.price}
-              image={product.image}
-              previousPrice={product.previousPrice}
-              discount={product.discount}
-              seller={product.seller}
+              id={product.id}
+              name={product.name ?? "Producto sin nombre"}
+              price={formatProductPrice(product.sale_type === "auction"
+                ? product.current_bid ?? product.starting_price ?? null
+                : getActiveDiscountPrice(product) ?? product.price)}
+              image={getProductImage(product)}
+              previousPrice={getActiveDiscountPrice(product) !== null ? formatProductPrice(product.price) : undefined}
+              discount={getDiscountLabel(product)}
+              saleType={product.sale_type}
+              currentBid={product.current_bid}
             />
           ))}
         </div>
+        {products.length === 0 && <p className="text-sm text-muted-foreground">Aún no hay productos publicados.</p>}
       </div>
     </section>
   );

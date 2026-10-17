@@ -15,5 +15,4 @@ jobs:
           args: |
             **${{ github.actor }}** hizo commit a **${{ github.repository }}**
             Branch: `${{ github.ref_name }}`
-            Commit: `\${{ github.event.head_commit.message }}`
-            Compare: ${{ github.event.compare }}
+            Commit: `${{ github.event.head_commit.message }}`

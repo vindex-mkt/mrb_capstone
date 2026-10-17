@@ -62,10 +62,11 @@ export default function Footer() {
           {/* Marca */}
           <div className="md:col-span-4">
             <Link href="/" className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-base font-extrabold">
-                V
-              </span>
-              <span className="text-lg font-extrabold tracking-tight">Vindex</span>
+              <img 
+                src="logo.png" 
+                alt="Logo de Vindex" 
+                className="mx-left h-20 w-auto object-contain" 
+             />
             </Link>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/60">
               El marketplace chileno donde comprar, vender y pujar en vivo es
@@ -88,7 +89,7 @@ export default function Footer() {
                 {group.links.map((link) => (
                   <li key={link}>
                     <Link
-                      href="#"
+                      href={link === "Sobre nosotros" ? "/about" : "#"}
                       className="text-sm text-white/70 transition hover:text-brand-300"
                     >
                       {link}
@@ -125,7 +126,7 @@ export default function Footer() {
       {/* Barra inferior */}
       <div className="border-t border-white/10">
         <div className="container-site flex flex-col items-center justify-between gap-3 py-6 text-sm text-white/50 sm:flex-row">
-          <p>© {new Date().getFullYear()} Vindex · Hecho en Chile 🇨🇱</p>
+          <p>© {new Date().getFullYear()} Vindex · Hecho en Chile</p>
           <div className="flex gap-6">
             <Link href="#" className="transition hover:text-white">
               Privacidad

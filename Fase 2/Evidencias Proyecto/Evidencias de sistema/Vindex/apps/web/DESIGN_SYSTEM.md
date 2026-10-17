@@ -158,3 +158,10 @@ import { IconSearch } from "@/components/icons";
 - [ ] Prueba en 360 px y escritorio.
 - [ ] Se reutilizó `ProductCard` / clases del sistema en vez de duplicar markup.
 - [ ] Cambio de UI documentado aquí si modifica tokens o añade componentes.
+
+## 9. Superficies de subastas
+
+- El catálogo y las tarjetas de subasta reutilizan los tokens y componentes shadcn/ui existentes (`Card`, `Badge`, `Button`, `Input`).
+- El componente `AuctionCountdown` representa días, horas, minutos y segundos; usa el tono de urgencia cuando quedan tres minutos o menos.
+- Las tarjetas y la sala usan imágenes públicas de `products.images`; las nuevas cargas de producto se convierten a WebP en el flujo de publicación.
+- Solo el detalle de una subasta presenta datos en vivo. Los listados muestran datos iniciales y temporizadores locales sin abrir conexiones Realtime.

@@ -1,39 +1,10 @@
 import ProductCard from "@/components/ProductCard";
 import { IconChevronRight } from "@/components/icons";
+import { formatProductPrice, getActiveDiscountPrice, getDiscountLabel, getLatestProducts, getProductImage } from "@/lib/supabase/queries";
 
-const products = [
-  {
-    id: 1,
-    name: "Auriculares over-ear",
-    price: "$24.990",
-    seller: "Arte & Diseño",
-    image: "https://picsum.photos/seed/vx-audio/400/400",
-  },
-  {
-    id: 2,
-    name: "Botella térmica 750 ml",
-    price: "$19.990",
-    seller: "Vintage Chile",
-    image: "https://picsum.photos/seed/vx-termica/400/400",
-  },
-  {
-    id: 3,
-    name: "Libro ilustrado de colección",
-    price: "$15.990",
-    seller: "Coleccionistas",
-    image: "https://picsum.photos/seed/vx-libro/400/400",
-  },
-  {
-    id: 4,
-    name: "Set de tazas artesanales",
-    price: "$22.990",
-    discount: "-10%",
-    seller: "Arte & Diseño",
-    image: "https://picsum.photos/seed/vx-tazas/400/400",
-  },
-];
+export default async function LatestProducts() {
+	const products = await getLatestProducts();
 
-export default function LatestProducts() {
   return (
     <section className="flex h-full flex-col">
       <div className="mb-5 flex items-center justify-between gap-4">
@@ -54,14 +25,20 @@ export default function LatestProducts() {
         {products.map((product) => (
           <ProductCard
             key={product.id}
-            name={product.name}
-            price={product.price}
-            image={product.image}
-            discount={product.discount}
-            seller={product.seller}
+            id={product.id}
+            name={product.name ?? "Producto sin nombre"}
+            price={formatProductPrice(product.sale_type === "auction"
+              ? product.current_bid ?? product.starting_price ?? null
+              : getActiveDiscountPrice(product) ?? product.price)}
+            image={getProductImage(product)}
+            previousPrice={getActiveDiscountPrice(product) !== null ? formatProductPrice(product.price) : undefined}
+            discount={getDiscountLabel(product)}
+            saleType={product.sale_type}
+            currentBid={product.current_bid}
           />
         ))}
       </div>
+        {products.length === 0 && <p className="text-sm text-muted-foreground">Aún no hay publicaciones disponibles.</p>}
     </section>
   );
 }

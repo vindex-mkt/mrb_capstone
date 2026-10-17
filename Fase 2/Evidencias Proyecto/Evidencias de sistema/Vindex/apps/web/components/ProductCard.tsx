@@ -1,6 +1,10 @@
-import { IconHeart } from "@/components/icons";
+"use client";
+
+import { useRouter } from "next/navigation";
+import FavoriteButton from "@/components/FavoriteButton";
 
 interface ProductCardProps {
+  id: number;
   name: string;
   price: string;
   image: string;
@@ -8,6 +12,8 @@ interface ProductCardProps {
   previousPrice?: string;
   /** Etiqueta de descuento, p. ej. "-31%" */
   discount?: string;
+  saleType?: string | null;
+  currentBid?: number | null;
   /** Vendedor / tienda */
   seller?: string;
 }
@@ -17,15 +23,37 @@ interface ProductCardProps {
  * Ver reglas en apps/web/DESIGN_SYSTEM.md → Componentes → card.
  */
 export default function ProductCard({
+  id,
   name,
   price,
   image,
   previousPrice,
   discount,
+  saleType,
+  currentBid,
   seller,
 }: ProductCardProps) {
+  const router = useRouter();
+  const isAuction = saleType === "auction";
+
+  const openProduct = () => {
+    router.push(isAuction ? `/subastas/${id}` : `/product/${id}`);
+  };
+
   return (
-    <article className="card group flex h-full flex-col transition duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-card-hover">
+    <article
+      role="button"
+      tabIndex={0}
+      aria-label={`Ver detalles de ${name}`}
+      onClick={openProduct}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openProduct();
+        }
+      }}
+      className="card group flex h-full cursor-pointer flex-col transition duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+    >
       {/* Imagen */}
       <div className="relative aspect-square overflow-hidden bg-muted">
         <img
@@ -39,17 +67,11 @@ export default function ProductCard({
           <span className="badge badge-accent absolute left-3 top-3">{discount}</span>
         )}
 
-        <button
-          type="button"
-          aria-label={`Agregar ${name} a favoritos`}
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface/90 text-foreground backdrop-blur transition hover:border-brand-300 hover:text-brand-700"
-        >
-          <IconHeart className="h-4 w-4" />
-        </button>
+        <FavoriteButton productId={id} productName={name} />
 
         {/* CTA al pasar el cursor */}
         <div className="pointer-events-none absolute inset-x-3 bottom-3 translate-y-2 opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-          <span className="btn btn-primary h-9 w-full rounded-full !bg-foreground hover:!bg-brand-700">
+          <span className="btn btn-primary h-9 w-full rounded-full bg-foreground! hover:bg-brand-700!">
             Ver producto
           </span>
         </div>
@@ -61,6 +83,8 @@ export default function ProductCard({
           {name}
         </h3>
 
+        {isAuction && <span className="badge badge-soft mt-2 w-fit">Subasta</span>}
+
         {seller && (
           <p className="mt-1.5 truncate text-xs text-muted-foreground">
             por {seller}
@@ -68,6 +92,11 @@ export default function ProductCard({
         )}
 
         <div className="mt-auto flex flex-wrap items-baseline gap-x-2 pt-3">
+          {isAuction && (
+            <span className="basis-full text-xs text-muted-foreground">
+              {currentBid !== null && currentBid !== undefined ? "Última puja" : "Precio inicial"}
+            </span>
+          )}
           <span className="text-lg font-extrabold tracking-tight text-foreground">
             {price}
           </span>

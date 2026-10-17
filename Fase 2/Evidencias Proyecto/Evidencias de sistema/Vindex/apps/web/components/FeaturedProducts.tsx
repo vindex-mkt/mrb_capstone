@@ -1,43 +1,10 @@
 import ProductCard from "@/components/ProductCard";
 import { IconChevronRight } from "@/components/icons";
+import { formatProductPrice, getActiveDiscountPrice, getDiscountLabel, getFeaturedProducts, getProductImage } from "@/lib/supabase/queries";
 
-const products = [
-  {
-    id: 1,
-    name: "Cámara analógica compacta",
-    price: "$89.990",
-    previousPrice: "$129.990",
-    discount: "-31%",
-    seller: "Retro Store",
-    image: "https://picsum.photos/seed/vx-camara/800/800",
-  },
-  {
-    id: 2,
-    name: "Polera edición limitada",
-    price: "$34.990",
-    discount: "-20%",
-    seller: "Arte & Diseño",
-    image: "https://picsum.photos/seed/vx-polera/800/800",
-  },
-  {
-    id: 3,
-    name: "Figura coleccionable 30 cm",
-    price: "$59.990",
-    seller: "Coleccionistas",
-    image: "https://picsum.photos/seed/vx-figura/800/800",
-  },
-  {
-    id: 4,
-    name: "Consola retro reparada",
-    price: "$129.990",
-    previousPrice: "$159.990",
-    discount: "-19%",
-    seller: "Retro Store",
-    image: "https://picsum.photos/seed/vx-consola/800/800",
-  },
-];
+export default async function FeaturedProducts() {
+	const products = await getFeaturedProducts();
 
-export default function FeaturedProducts() {
   return (
     <section className="relative overflow-hidden bg-linear-to-br from-brand-700 via-brand-600 to-brand-500">
       {/* Decoración difuminada */}
@@ -63,19 +30,20 @@ export default function FeaturedProducts() {
           </a>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 xl:grid-cols-6">
           {products.map((product) => (
             <ProductCard
               key={product.id}
-              name={product.name}
-              price={product.price}
-              image={product.image}
-              previousPrice={product.previousPrice}
-              discount={product.discount}
-              seller={product.seller}
+              id={product.id}
+              name={product.name ?? "Producto sin nombre"}
+              price={formatProductPrice(getActiveDiscountPrice(product) ?? product.price)}
+              image={getProductImage(product)}
+              previousPrice={getActiveDiscountPrice(product) !== null ? formatProductPrice(product.price) : undefined}
+              discount={getDiscountLabel(product)}
             />
           ))}
         </div>
+        {products.length === 0 && <p className="text-sm text-white/80">Aún no hay productos destacados.</p>}
       </div>
     </section>
   );
