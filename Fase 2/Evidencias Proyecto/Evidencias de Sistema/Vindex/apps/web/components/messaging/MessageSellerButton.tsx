@@ -35,7 +35,6 @@ export default function MessageSellerButton({
       if (!isCurrent) return;
       if (error) {
         console.error("No se pudo verificar la sesión para mensajería:", error);
-        showToast("No se pudo verificar tu sesión.", "error");
         setUserId(null);
         return;
       }
