@@ -62,6 +62,8 @@ DROP FUNCTION public._json_images_to_text_array(json);
 
 La relación `products.seller_id` referencia `profiles.id` mediante la restricción `fk_products_profiles`. Las consultas de detalle cargan el nombre del vendedor con `seller:profiles!fk_products_profiles (id, full_name)`. Los productos muestran una tienda asociada cuando `store_id` apunta a una fila de `public.stores` con columna `name`.
 
+Las publicaciones destacadas usan `is_featured` y `featured_until`. Al publicar desde `/vender` con un destacado pagado, el formulario guarda `is_featured = true` y calcula `featured_until` con la fecha de publicación más la duración contratada (1, 3, 7 o 14 días). La portada solo consulta productos con `is_featured = true`, `featured_until` vigente, estado activo y stock disponible. El cobro del destacado es simulado en el cliente y no crea una orden de compra.
+
 ## Subastas en vivo
 
 Las subastas se almacenan en `public.products`, con `sale_type = 'auction'` y los campos `starting_price`, `current_bid`, `bid_increment`, `auction_ends_at` (`timestamptz`) y `winner_id` (UUID del perfil ganador). El vendedor de una subasta se obtiene desde `public.profiles` por la relación existente `products.seller_id` → `profiles.id`.

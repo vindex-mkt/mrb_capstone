@@ -4,6 +4,7 @@
 
 ### Added
 
+- Destacado de publicaciones con pago simulado en un modal desde el formulario de venta.
 
 ### Changed
 

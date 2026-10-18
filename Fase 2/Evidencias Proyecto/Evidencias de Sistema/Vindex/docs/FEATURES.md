@@ -24,6 +24,7 @@ Status: 🟡 En desarrollo
 - [x] Mensajería entre compradores y vendedores para productos de compra directa
 - [x] Carrito sincronizado y persistido para productos de compra directa
 - [x] Checkout simulado con selección de dirección, envío y método de pago
+- [x] Destacar publicaciones desde el formulario de venta con pago simulado en un modal
 - [x] Historial de compras del comprador y calificación de productos comprados
 - [ ] Eliminar producto
 
@@ -57,6 +58,7 @@ Status: 🟡 Simulación disponible
 
 - [x] Métodos simulados Webpay Plus y Mercado Pago
 - [x] Creación de órdenes mediante la RPC `process_mock_checkout`
+- [x] Pago simulado de destacados desde el formulario de venta
 - [ ] Integración real de pasarela
 - [ ] Custodia
 - [ ] Liberación de fondos
