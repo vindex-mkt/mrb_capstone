@@ -13,6 +13,7 @@ export type ProductListing = {
 	seller_id: string;
 	seller?: { id: string; full_name: string | null } | null;
 	store_id: number | null;
+	category_id?: string | null;
 	store_category_id?: number | null;
 	condition: string | null;
 	status: boolean | null;

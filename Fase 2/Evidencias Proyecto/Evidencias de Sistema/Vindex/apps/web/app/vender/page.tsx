@@ -24,7 +24,7 @@ type SelectedImage = {
 	previewUrl: string;
 };
 
-type ProductCategory = { id: number; name: string };
+type ProductCategory = { id: string; name: string };
 type OwnedStore = { id: number; name: string };
 type StoreCategory = { id: number; name: string };
 
@@ -493,7 +493,7 @@ export default function SellProductPage() {
 				seller_id: user.id,
 				store_id: storeId ? Number(storeId) : null,
 				store_category_id: storeId && storeCategoryId ? Number(storeCategoryId) : null,
-				category_id: categoryId ? Number(categoryId) : null,
+				category_id: categoryId || null,
 				name: name.trim(),
 				slug: productSlug,
 				description: description.trim() || null,

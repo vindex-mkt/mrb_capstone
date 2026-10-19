@@ -20,6 +20,7 @@ export default function MessageSellerButton({
 }: MessageSellerButtonProps) {
   const [supabase] = useState(createClient);
   const [userId, setUserId] = useState<string | null>(null);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { showToast } = useToast();
@@ -28,27 +29,36 @@ export default function MessageSellerButton({
   useEffect(() => {
     let isCurrent = true;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (isCurrent) setUserId(session?.user.id ?? null);
+      if (isCurrent) {
+        setUserId(session?.user.id ?? null);
+        setSessionLoaded(true);
+      }
     });
 
-    void supabase.auth.getUser().then(({ data, error }) => {
+    void supabase.auth.getSession().then(({ data, error }) => {
       if (!isCurrent) return;
       if (error) {
         console.error("No se pudo verificar la sesión para mensajería:", error);
         setUserId(null);
+        setSessionLoaded(true);
         return;
       }
-      setUserId(data.user?.id ?? null);
+      setUserId(data.session?.user.id ?? null);
+      setSessionLoaded(true);
     });
 
     return () => {
       isCurrent = false;
       subscription.unsubscribe();
     };
-  }, [showToast, supabase]);
+  }, [supabase]);
 
   const openConversation = async () => {
-    if (!userId || isLoading) return;
+    if (!userId) {
+      router.push(`/login?next=${encodeURIComponent(`/product/${productId}`)}`);
+      return;
+    }
+    if (isLoading) return;
     setIsLoading(true);
 
     try {
@@ -95,7 +105,7 @@ export default function MessageSellerButton({
     }
   };
 
-  if (!isDirectSale || !userId || userId === sellerId) return null;
+  if (!isDirectSale || !sessionLoaded || userId === sellerId) return null;
 
   return (
     <Button

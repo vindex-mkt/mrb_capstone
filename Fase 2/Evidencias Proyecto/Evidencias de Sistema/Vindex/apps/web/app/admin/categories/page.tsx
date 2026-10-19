@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { createClient } from "@/lib/supabase/client";
 
 type Category = {
-  id: number;
+  id: string;
   name: string;
   slug: string;
   description: string | null;
@@ -36,7 +36,7 @@ export default function CategoriesAdminPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [icon, setIcon] = useState("");
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [editingDescription, setEditingDescription] = useState("");
   const [editingIcon, setEditingIcon] = useState("");
@@ -145,7 +145,7 @@ export default function CategoriesAdminPage() {
     setFeedback("");
   };
 
-  const saveEdit = async (categoryId: number) => {
+  const saveEdit = async (categoryId: string) => {
     const trimmedName = editingName.trim();
     const slug = toSlug(trimmedName);
     if (!trimmedName || !slug) {
