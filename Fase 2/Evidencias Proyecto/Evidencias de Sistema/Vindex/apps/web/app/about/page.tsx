@@ -46,7 +46,7 @@ export default function AboutPage() {
               confianza.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/shop" className="btn btn-light h-11 px-5">
+              <Link href="/tienda" className="btn btn-light h-11 px-5">
                 Explorar marketplace
               </Link>
               <Link
@@ -107,7 +107,7 @@ export default function AboutPage() {
               una comunidad que transforma la manera de intercambiar productos.
             </p>
           </div>
-          <Link href="/shop" className="btn btn-primary h-11 px-5">
+          <Link href="/tienda" className="btn btn-primary h-11 px-5">
             Comenzar a explorar
           </Link>
         </div>

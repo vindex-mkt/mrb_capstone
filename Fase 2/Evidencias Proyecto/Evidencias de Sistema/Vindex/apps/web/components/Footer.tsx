@@ -63,7 +63,7 @@ export default function Footer() {
           <div className="md:col-span-4">
             <Link href="/" className="flex items-center gap-2.5">
               <img 
-                src="logo.png" 
+                src="/logo.png" 
                 alt="Logo de Vindex" 
                 className="mx-left h-20 w-auto object-contain" 
              />
@@ -89,7 +89,13 @@ export default function Footer() {
                 {group.links.map((link) => (
                   <li key={link}>
                     <Link
-                      href={link === "Sobre nosotros" ? "/about" : "#"}
+                      href={
+                        link === "Sobre nosotros" ? "/about"
+                          : link === "Productos" ? "/tienda"
+                            : link === "Subastas" ? "/subastas"
+                              : link === "Ofertas del día" ? "/ofertas"
+                                : "#"
+                      }
                       className="text-sm text-white/70 transition hover:text-brand-300"
                     >
                       {link}

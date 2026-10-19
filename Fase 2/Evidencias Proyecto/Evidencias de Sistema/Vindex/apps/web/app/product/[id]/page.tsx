@@ -33,7 +33,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
           <Link href="/" className="hover:text-foreground">Inicio</Link>
           <span>/</span>
-          <Link href="/shop" className="hover:text-foreground">Tienda</Link>
+          <Link href="/tienda" className="hover:text-foreground">Tienda</Link>
           <span>/</span>
           <span className="text-foreground">{product.name ?? "Producto"}</span>
         </div>
@@ -130,7 +130,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
         <div className="mt-10 flex items-center justify-between gap-4 border-t border-border pt-6">
           <span className="text-sm text-muted-foreground">¿Te interesa este producto?</span>
-          <Link href="/shop" className="inline-flex items-center gap-2 text-sm font-medium text-brand-700 hover:text-brand-800">
+          <Link href="/tienda" className="inline-flex items-center gap-2 text-sm font-medium text-brand-700 hover:text-brand-800">
             Volver a la tienda
             <IconArrowRight className="h-4 w-4" />
           </Link>

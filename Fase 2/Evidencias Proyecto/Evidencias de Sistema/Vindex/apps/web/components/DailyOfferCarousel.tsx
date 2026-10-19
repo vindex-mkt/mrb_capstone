@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { IconArrowRight, IconBolt, IconChevronRight, IconTag } from "@/components/icons";
 import OfferCountdown from "@/components/OfferCountdown";
 import { formatProductPrice } from "@/lib/formatters";
@@ -92,10 +93,13 @@ export default function DailyOfferCarousel({ deals }: { deals: ProductListing[] 
           </span>
         </div>
 
-        <a href="/shop" className="btn btn-primary mt-4 w-full py-3">
+        <Link
+          href={product.sale_type === "auction" ? `/subastas/${product.id}` : `/product/${product.id}`}
+          className="btn btn-primary mt-4 w-full py-3"
+        >
           Ver oferta
           <IconArrowRight className="h-4 w-4" />
-        </a>
+        </Link>
 
         {deals.length > 1 && (
           <div className="mt-4 flex items-center justify-between border-t border-border pt-3">

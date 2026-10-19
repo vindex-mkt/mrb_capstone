@@ -20,6 +20,7 @@ Status: 🟡 En desarrollo
 - [x] Crear producto
 - [x] Editar publicaciones propias desde el perfil de vendedor
 - [x] Crear y renovar ofertas con vencimiento
+- [x] Consultar las ofertas activas en una página dedicada y abrir el detalle de cada producto
 - [x] Listar publicaciones activas ordenadas por fecha en la portada
 - [x] Mensajería entre compradores y vendedores para productos de compra directa
 - [x] Carrito sincronizado y persistido para productos de compra directa
