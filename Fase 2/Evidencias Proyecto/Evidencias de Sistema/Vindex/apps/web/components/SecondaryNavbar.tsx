@@ -49,8 +49,8 @@ export default function SecondaryNavbar() {
   }, [supabase]);
 
   return (
-    <nav aria-label="Navegación principal" className="relative z-40 border-b border-border bg-surface">
-      <div className="container-site relative flex flex-nowrap items-center gap-1 overflow-x-auto no-scrollbar">
+    <nav aria-label="Navegación principal" className="relative z-50 border-b border-border bg-surface">
+      <div className="container-site relative flex flex-nowrap items-center gap-1 overflow-x-auto no-scrollbar md:overflow-x-visible">
         {NAV_LINKS.map((link) => {
           const isActive = pathname === link.href;
 
