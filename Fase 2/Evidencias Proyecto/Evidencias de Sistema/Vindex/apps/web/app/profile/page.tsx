@@ -28,6 +28,7 @@ type SellerProduct = {
   id: number;
   name: string | null;
   description: string | null;
+  category_id: string | null;
   price: number | null;
   stock: number | null;
   images: string[] | null;
@@ -49,7 +50,10 @@ type ProductDraft = {
   discountPrice: string;
   offerDurationHours: string;
   renewOffer: boolean;
+  categoryId: string;
 };
+
+type ProductCategory = { id: string; name: string };
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -68,6 +72,8 @@ export default function ProfilePage() {
   const [sellerProducts, setSellerProducts] = useState<SellerProduct[]>([]);
   const [sellerProductsLoading, setSellerProductsLoading] = useState(true);
   const [sellerProductsError, setSellerProductsError] = useState<string | null>(null);
+  const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
+  const [productCategoriesError, setProductCategoriesError] = useState<string | null>(null);
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const [productDraft, setProductDraft] = useState<ProductDraft | null>(null);
   const [savingProductId, setSavingProductId] = useState<number | null>(null);
@@ -139,18 +145,26 @@ export default function ProfilePage() {
         setReferences(typeof profile?.references === "string" ? profile.references : typeof metadata.references === "string" ? metadata.references : typeof metadata.observacion === "string" ? metadata.observacion : "");
       }
 
-      const { data: products, error: productsError } = await supabase
-        .from("products")
-        .select("id, name, description, price, stock, images, discount_price, offer_ends_at, sale_type, starting_price, current_bid, bid_increment, auction_ends_at, created_at")
-        .eq("seller_id", user.id)
-        .eq("status", true)
-        .order("created_at", { ascending: false });
+      const [productsResult, categoriesResult] = await Promise.all([
+        supabase
+          .from("products")
+          .select("id, name, description, category_id, price, stock, images, discount_price, offer_ends_at, sale_type, starting_price, current_bid, bid_increment, auction_ends_at, created_at")
+          .eq("seller_id", user.id)
+          .eq("status", true)
+          .order("created_at", { ascending: false }),
+        supabase.from("categories").select("id, name").order("name", { ascending: true }),
+      ]);
 
       if (!isCurrent) return;
-      if (productsError) {
-        setSellerProductsError(productsError.message);
+      if (productsResult.error) {
+        setSellerProductsError(productsResult.error.message);
       } else {
-        setSellerProducts((products ?? []) as SellerProduct[]);
+        setSellerProducts((productsResult.data ?? []) as SellerProduct[]);
+      }
+      if (categoriesResult.error) {
+        setProductCategoriesError(categoriesResult.error.message);
+      } else {
+        setProductCategories((categoriesResult.data ?? []) as ProductCategory[]);
       }
       setSellerProductsLoading(false);
       setProfileLoading(false);
@@ -230,6 +244,7 @@ export default function ProfilePage() {
       discountPrice: product.discount_price === null ? "" : String(product.discount_price),
       offerDurationHours: "24",
       renewOffer: offerIsExpired,
+      categoryId: product.category_id ?? "",
     });
   };
 
@@ -274,6 +289,7 @@ export default function ProfilePage() {
       .update({
         name: productDraft.name.trim(),
         description: productDraft.description.trim() || null,
+        category_id: productDraft.categoryId || null,
         price: isAuction ? null : parsedPrice,
         stock: parsedStock,
         discount_price: parsedDiscountPrice,
@@ -294,6 +310,7 @@ export default function ProfilePage() {
           ...currentProduct,
           name: productDraft.name.trim(),
           description: productDraft.description.trim() || null,
+          category_id: productDraft.categoryId || null,
             price: isAuction ? null : parsedPrice,
           stock: parsedStock,
           discount_price: parsedDiscountPrice,
@@ -592,6 +609,7 @@ export default function ProfilePage() {
                   {productSaveError && <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">{productSaveError}</p>}
                   {productSaveMessage && <p role="status" className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">{productSaveMessage}</p>}
                   {sellerProductsError && <p role="alert" className="text-sm text-red-700">No se pudieron cargar tus productos: {sellerProductsError}</p>}
+                  {productCategoriesError && <p role="alert" className="text-sm text-red-700">No se pudieron cargar las categorías: {productCategoriesError}</p>}
                   {sellerProductsLoading ? (
                     <p role="status" className="text-sm text-muted-foreground">Cargando tus productos...</p>
                   ) : sellerProducts.length === 0 && !sellerProductsError ? (
@@ -678,6 +696,13 @@ export default function ProfilePage() {
                                 <div className="space-y-2">
                                   <Label htmlFor={`product-stock-${product.id}`}>Stock</Label>
                                   <Input id={`product-stock-${product.id}`} type="number" min="0" step="any" value={productDraft.stock} onChange={(event) => setProductDraft({ ...productDraft, stock: event.target.value })} required />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor={`product-category-${product.id}`}>Categoría</Label>
+                                  <Select id={`product-category-${product.id}`} value={productDraft.categoryId} onChange={(event) => setProductDraft({ ...productDraft, categoryId: event.target.value })}>
+                                    <option value="">Sin categoría</option>
+                                    {productCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                                  </Select>
                                 </div>
                                 {!isAuction && <div className="space-y-2 sm:col-span-2">
                                   <Label htmlFor={`product-discount-${product.id}`}>Precio de oferta (opcional)</Label>

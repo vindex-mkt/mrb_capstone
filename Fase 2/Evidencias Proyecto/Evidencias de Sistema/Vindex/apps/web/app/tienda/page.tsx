@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,11 +25,11 @@ type CatalogProduct = {
     stock: number | null;
     seller_id: string;
     condition: string | null;
-    category_id: number | null;
+    category_id: string | null;
     created_at: string;
 };
 
-type ProductCategory = { id: number; name: string };
+type ProductCategory = { id: string; name: string };
 
 const conditions = ["Nuevo", "Usado", "Reacondicionado"];
 const fallbackImage = "https://picsum.photos/seed/vindex-catalog/640/640";
@@ -39,20 +40,28 @@ const getCurrentPrice = (product: CatalogProduct) =>
         ? product.discount_price
         : product.price;
 
-export default function Shop() {
+function ShopCatalog() {
     const supabase = createClient();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const requestedCategoryId = searchParams.get("categoryId") ?? "";
     const [products, setProducts] = useState<CatalogProduct[]>([]);
     const [categories, setCategories] = useState<ProductCategory[]>([]);
     const [search, setSearch] = useState("");
     const [minimumPrice, setMinimumPrice] = useState("");
     const [maximumPrice, setMaximumPrice] = useState("");
     const [condition, setCondition] = useState("");
-    const [categoryId, setCategoryId] = useState("");
+    const [categoryId, setCategoryId] = useState(requestedCategoryId);
     const [sort, setSort] = useState("recent");
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState("");
+    const [categoryErrorMessage, setCategoryErrorMessage] = useState("");
     const addItem = useCartStore((state) => state.addItem);
     const hasCartHydrated = useCartStore((state) => state.hasHydrated);
+
+    useEffect(() => {
+        setCategoryId(requestedCategoryId);
+    }, [requestedCategoryId]);
 
     useEffect(() => {
         let isCurrent = true;
@@ -66,7 +75,7 @@ export default function Shop() {
                     .in("sale_type", ["direct", "fixed_price"])
                     .gt("stock", 0)
                     .order("created_at", { ascending: false }),
-                supabase.from("categories").select("id, name").order("name"),
+                supabase.from("categories").select("id, name").order("name", { ascending: true }),
             ]);
 
             if (!isCurrent) return;
@@ -77,6 +86,8 @@ export default function Shop() {
             }
             if (!categoryResult.error) {
                 setCategories((categoryResult.data ?? []) as ProductCategory[]);
+            } else {
+                setCategoryErrorMessage(categoryResult.error.message);
             }
             setLoading(false);
         };
@@ -97,7 +108,7 @@ export default function Shop() {
                     (!minimumPrice || price >= Number(minimumPrice)) &&
                     (!maximumPrice || price <= Number(maximumPrice)) &&
                     (!condition || product.condition === condition) &&
-                    (!categoryId || String(product.category_id) === categoryId)
+                    (!categoryId || product.category_id === categoryId)
                 );
             })
             .sort((first, second) => {
@@ -158,12 +169,17 @@ export default function Shop() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="catalog-category">Categoría</Label>
-                                      <Select id="catalog-category" value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className="h-10 rounded-lg focus-visible:ring-2 focus-visible:ring-brand-600">
+                                      <Select id="catalog-category" value={categoryId} onChange={(event) => {
+                                        const nextCategoryId = event.target.value;
+                                        setCategoryId(nextCategoryId);
+                                        router.replace(nextCategoryId ? `/tienda?categoryId=${encodeURIComponent(nextCategoryId)}` : "/tienda", { scroll: false });
+                                      }} className="h-10 rounded-lg focus-visible:ring-2 focus-visible:ring-brand-600">
                                         <option value="">Todas las categorías</option>
                                         {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
                                       </Select>
+                                    {categoryErrorMessage && <p role="alert" className="text-xs text-red-700">No se pudieron cargar las categorías: {categoryErrorMessage}</p>}
                                 </div>
-                                <Button type="button" variant="outline" className="w-full rounded-lg" onClick={() => { setSearch(""); setMinimumPrice(""); setMaximumPrice(""); setCondition(""); setCategoryId(""); }}>
+                                <Button type="button" variant="outline" className="w-full rounded-lg" onClick={() => { setSearch(""); setMinimumPrice(""); setMaximumPrice(""); setCondition(""); setCategoryId(""); router.replace("/tienda", { scroll: false }); }}>
                                     Limpiar filtros
                                 </Button>
                             </CardContent>
@@ -222,5 +238,19 @@ export default function Shop() {
                 </div>
             </section>
         </main>
+    );
+}
+
+export default function Shop() {
+    return (
+        <Suspense fallback={
+            <main className="min-h-screen bg-background">
+                <section className="container-site py-8 sm:py-10">
+                    <p role="status" className="py-12 text-center text-sm text-muted-foreground">Cargando catálogo...</p>
+                </section>
+            </main>
+        }>
+            <ShopCatalog />
+        </Suspense>
     );
 }
