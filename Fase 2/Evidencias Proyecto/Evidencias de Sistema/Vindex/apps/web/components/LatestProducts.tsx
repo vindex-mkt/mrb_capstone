@@ -1,5 +1,4 @@
 import ProductCard from "@/components/ProductCard";
-import MessageSellerButton from "@/components/messaging/MessageSellerButton";
 import { IconChevronRight } from "@/components/icons";
 import { formatProductPrice, getActiveDiscountPrice, getDiscountLabel, getLatestProducts, getProductImage } from "@/lib/supabase/queries";
 
@@ -24,29 +23,19 @@ export default async function LatestProducts() {
 
       <div className="grid flex-1 grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {products.map((product) => (
-          <div key={product.id} className="flex flex-col">
-            <ProductCard
-              id={product.id}
-              name={product.name ?? "Producto sin nombre"}
-              price={formatProductPrice(product.sale_type === "auction"
-                ? product.current_bid ?? product.starting_price ?? null
-                : getActiveDiscountPrice(product) ?? product.price)}
-              image={getProductImage(product)}
-              previousPrice={getActiveDiscountPrice(product) !== null ? formatProductPrice(product.price) : undefined}
-              discount={getDiscountLabel(product)}
-              saleType={product.sale_type}
-              currentBid={product.current_bid}
-            />
-            {product.sale_type !== "auction" && (
-              <div className="mt-2 flex">
-                <MessageSellerButton
-                  productId={product.id}
-                  sellerId={product.seller_id}
-                  saleType={product.sale_type}
-                />
-              </div>
-            )}
-          </div>
+          <ProductCard
+            key={product.id}
+            id={product.id}
+            name={product.name ?? "Producto sin nombre"}
+            price={formatProductPrice(product.sale_type === "auction"
+              ? product.current_bid ?? product.starting_price ?? null
+              : getActiveDiscountPrice(product) ?? product.price)}
+            image={getProductImage(product)}
+            previousPrice={getActiveDiscountPrice(product) !== null ? formatProductPrice(product.price) : undefined}
+            discount={getDiscountLabel(product)}
+            saleType={product.sale_type}
+            currentBid={product.current_bid}
+          />
         ))}
       </div>
         {products.length === 0 && <p className="text-sm text-muted-foreground">Aún no hay publicaciones disponibles.</p>}
