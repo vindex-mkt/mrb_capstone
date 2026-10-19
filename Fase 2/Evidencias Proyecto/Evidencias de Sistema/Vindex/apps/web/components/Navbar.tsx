@@ -192,10 +192,11 @@ export default function Navbar() {
               ) : (
                 <Link
                   href="/login"
-                  className="hidden items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-brand-50 hover:text-brand-700 lg:flex"
+                  aria-label="Ingresar o registrarme"
+                  className="icon-btn h-10 w-10 lg:h-auto lg:w-auto lg:gap-2 lg:rounded-full lg:border-0 lg:bg-transparent lg:px-3 lg:py-2 lg:text-sm lg:font-semibold lg:hover:bg-brand-50 lg:hover:text-brand-700"
                 >
                   <IconUser className="h-5 w-5" />
-                  Ingresar
+                  <span className="hidden lg:inline">Ingresar</span>
                 </Link>
               )}
 
