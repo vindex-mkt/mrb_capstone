@@ -149,13 +149,18 @@ export async function getProductStoreName(product: ProductListing): Promise<stri
 	return typeof data?.name === "string" ? data.name : null;
 }
 
-export async function getPopularStores(): Promise<StoreListing[]> {
+async function getStores(limit?: number): Promise<StoreListing[]> {
 	const supabase = await createSupabaseServerClient();
-	const { data: stores, error: storesError } = await supabase
+	let query = supabase
 		.from("stores")
 		.select("id, name, slug, logo_url")
-		.order("created_at", { ascending: false })
-		.limit(4);
+		.order("created_at", { ascending: false });
+
+	if (limit !== undefined) {
+		query = query.limit(limit);
+	}
+
+	const { data: stores, error: storesError } = await query;
 
 	if (storesError) {
 		logQueryError("las tiendas", storesError.message);
@@ -181,6 +186,14 @@ export async function getPopularStores(): Promise<StoreListing[]> {
 			total_reviews: Number(rating?.total_reviews ?? 0),
 		};
 	}) as StoreListing[];
+}
+
+export async function getPopularStores(): Promise<StoreListing[]> {
+	return getStores(4);
+}
+
+export async function getAllStores(): Promise<StoreListing[]> {
+	return getStores();
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductListing | null> {
