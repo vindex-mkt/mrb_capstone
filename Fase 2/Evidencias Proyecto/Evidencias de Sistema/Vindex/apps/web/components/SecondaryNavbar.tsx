@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { ChevronDown, ChevronRight, LoaderCircle } from "lucide-react";
 import { IconBolt } from "@/components/icons";
 import { createClient } from "@/lib/supabase/client";
 
@@ -17,10 +17,22 @@ const NAV_LINKS = [
 
 export default function SecondaryNavbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isNavigating, startNavigation] = useTransition();
   const [supabase] = useState(createClient);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoryError, setCategoryError] = useState("");
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+
+  const navigate = (href: string) => {
+    setCategoriesOpen(false);
+    startNavigation(() => router.push(href));
+  };
+
+  useEffect(() => {
+    setCategoriesOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -49,8 +61,8 @@ export default function SecondaryNavbar() {
   }, [supabase]);
 
   return (
-    <nav aria-label="Navegación principal" className="relative z-50 border-b border-border bg-surface">
-      <div className="container-site relative flex flex-nowrap items-center gap-1 overflow-x-auto no-scrollbar md:overflow-x-visible">
+    <nav aria-label="Navegación principal" className="relative z-40 border-b border-border bg-surface">
+      <div className="container-site relative flex flex-wrap items-center gap-1 md:flex-nowrap">
         {NAV_LINKS.map((link) => {
           const isActive = pathname === link.href;
 
@@ -58,24 +70,43 @@ export default function SecondaryNavbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`nav-tab inline-flex shrink-0 items-center whitespace-nowrap ${link.className || ""} ${
+              onClick={(event) => {
+                event.preventDefault();
+                navigate(link.href);
+              }}
+              className={`nav-tab inline-flex shrink-0 items-center whitespace-nowrap px-1.5 md:px-4 ${link.className || ""} ${
                 isActive ? "bg-brand-400 text-white" : ""
               }`}
             >
               {link.label}
-              </Link>
+            </Link>
           );
         })}
-        <div className="group relative">
-          <Link
-            href="/tienda"
+        <div
+          className="group relative"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setCategoriesOpen(false);
+          }}
+        >
+          <button
+            type="button"
             aria-haspopup="true"
-            className="nav-tab inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full text-brand-700"
+            aria-expanded={categoriesOpen}
+            aria-controls="secondary-navbar-categories"
+            onClick={() => setCategoriesOpen((open) => !open)}
+            className="nav-tab inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-1.5 text-brand-700 md:px-4"
           >
             Categorías
-            <ChevronDown className="h-4 w-4 transition-transform group-hover:rotate-180 group-focus-within:rotate-180" aria-hidden="true" />
-          </Link>
-          <div className="invisible absolute left-0 top-full z-50 mt-1 w-72 translate-y-1 rounded-2xl border border-border bg-surface p-3 opacity-0 shadow-xl transition duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${categoriesOpen ? "rotate-180" : ""} md:group-hover:rotate-180`}
+              aria-hidden="true"
+            />
+          </button>
+          <div
+            id="secondary-navbar-categories"
+            data-menu-open={categoriesOpen}
+            className="invisible absolute left-0 top-full z-50 mt-1 w-[min(18rem,calc(100vw-2rem))] translate-y-1 rounded-2xl border border-border bg-surface p-3 opacity-0 shadow-xl transition duration-200 data-[menu-open=true]:visible data-[menu-open=true]:translate-y-0 data-[menu-open=true]:opacity-100 md:w-72 md:group-hover:visible md:group-hover:translate-y-0 md:group-hover:opacity-100"
+          >
             <div className="mb-2 border-b border-border px-3 pb-3">
               <p className="text-sm font-semibold text-foreground">Explorar categorías</p>
               <p className="mt-1 text-xs text-muted-foreground">Encuentra productos por categoría</p>
@@ -98,6 +129,11 @@ export default function SecondaryNavbar() {
                   <Link
                     key={category.id}
                     href={`/tienda?categoryId=${encodeURIComponent(category.id)}`}
+                    aria-busy={isNavigating}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigate(`/tienda?categoryId=${encodeURIComponent(category.id)}`);
+                    }}
                     className="group/item flex items-center justify-between rounded-xl px-3 py-2 text-sm text-foreground transition hover:bg-brand-50 hover:text-brand-700 focus-visible:bg-brand-50 focus-visible:text-brand-700 focus-visible:outline-none"
                   >
                     <span>{category.name}</span>
@@ -116,7 +152,11 @@ export default function SecondaryNavbar() {
         </div>
         <Link
           href="/ofertas"
-          className={`nav-tab inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap my-1.5 rounded-full text-accent-600 hover:text-accent-700 ${
+          onClick={(event) => {
+            event.preventDefault();
+            navigate("/ofertas");
+          }}
+          className={`nav-tab my-1.5 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-1.5 text-accent-600 hover:text-accent-700 md:px-4 ${
             pathname === "/ofertas" ? "bg-brand-400 text-white" : ""
           }`}
         >
@@ -124,6 +164,16 @@ export default function SecondaryNavbar() {
           Ofertas
         </Link>
       </div>
+      {isNavigating && (
+        <div
+          className="fixed inset-0 z-[100] grid place-items-center bg-surface/60 backdrop-blur-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <LoaderCircle className="h-12 w-12 animate-spin text-brand-600" aria-hidden="true" />
+          <span className="sr-only">Cargando página...</span>
+        </div>
+      )}
     </nav>
   );
 }

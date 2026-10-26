@@ -97,7 +97,7 @@ export default function Navbar() {
   );
 
   return (
-    <header className="sticky top-0 z-50">
+    <header className="sticky top-0 z-[60]">
       {/* Barra de confianza 
 
       <div className="hidden bg-foreground text-white lg:block">
@@ -125,10 +125,10 @@ export default function Navbar() {
           <div className="flex h-16 items-center gap-3 sm:h-20 sm:gap-5">
             {/* Logo */}
             <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="Vindex, ir al inicio">
-              <img 
+              <img
                 src="/logo.png" 
                 alt="Logo de Vindex" 
-                className="mx-auto h-20 w-auto object-contain" 
+                className="mx-auto h-14 w-auto object-contain sm:h-20"
              />
             </Link>
 
@@ -149,17 +149,18 @@ export default function Navbar() {
                 >
                   <Link
                     href="/profile"
-                    className="flex max-w-36 items-center gap-2 rounded-l-full py-2 pl-3 pr-1 text-sm font-semibold text-foreground transition hover:bg-brand-50 hover:text-brand-700"
+                    aria-label={`Mi perfil, ${accountName}`}
+                    className="flex max-w-36 items-center gap-2 rounded-l-full py-2 pl-2 pr-1 text-sm font-semibold text-foreground transition hover:bg-brand-50 hover:text-brand-700 sm:pl-3"
                   >
                     <IconUser className="h-5 w-5 shrink-0" />
-                    <span className="max-w-24 truncate sm:max-w-36">{accountName}</span>
+                    <span className="hidden max-w-36 truncate sm:inline">{accountName}</span>
                   </Link>
                   <button
                     type="button"
                     aria-label="Opciones de cuenta"
                     aria-expanded={menuOpen}
                     onClick={() => setMenuOpen((open) => !open)}
-                    className="rounded-r-full py-2 pl-1 pr-3 text-foreground transition hover:bg-brand-50 hover:text-brand-700"
+                    className="rounded-r-full py-2 pl-1 pr-2 text-foreground transition hover:bg-brand-50 hover:text-brand-700 sm:pr-3"
                   >
                     <ChevronDown className="h-4 w-4" aria-hidden="true" />
                   </button>
@@ -207,9 +208,14 @@ export default function Navbar() {
 
               <CartNavButton />
 
-              <Link href="/vender" className="btn btn-primary hidden h-10 px-4 sm:inline-flex">
-                <IconPlus className="h-4 w-4" />
-                Vender
+              <Link
+                href="/vender"
+                aria-label="Vender"
+                title="Vender"
+                className="btn btn-primary h-10 w-10 px-0 sm:w-auto sm:px-4"
+              >
+                <IconPlus className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">Vender</span>
               </Link>
             </div>
           </div>

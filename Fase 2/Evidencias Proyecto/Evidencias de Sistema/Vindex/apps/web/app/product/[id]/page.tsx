@@ -128,8 +128,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
 
-        <div className="mt-10 flex items-center justify-between gap-4 border-t border-border pt-6">
-          <span className="text-sm text-muted-foreground">¿Te interesa este producto?</span>
+        <div className="mt-10 flex items-center justify-end gap-4 border-t border-border pt-6">
           <Link href="/tienda" className="inline-flex items-center gap-2 text-sm font-medium text-brand-700 hover:text-brand-800">
             Volver a la tienda
             <IconArrowRight className="h-4 w-4" />

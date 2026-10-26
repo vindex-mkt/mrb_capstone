@@ -615,7 +615,7 @@ export default function ProfilePage() {
                   ) : sellerProducts.length === 0 && !sellerProductsError ? (
                     <div className="rounded-md border border-dashed border-border p-6 text-center">
                       <p className="text-sm text-muted-foreground">Aún no tienes productos publicados.</p>
-                      <a href="/vender" className="btn btn-primary mt-4">Publicar un producto</a>
+                      <a href="/vender" className="btn btn-primary mt-4 px-6 py-3">Publicar un producto</a>
                     </div>
                   ) : (
                     sellerProducts.map((product) => {
