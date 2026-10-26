@@ -296,7 +296,10 @@ export default function AuctionRoom({
                   <CardDescription>Subasta en vivo</CardDescription>
                   <CardTitle className="mt-1 text-2xl">{product.name ?? "Subasta"}</CardTitle>
                 </div>
-                <Badge variant={isClosed || isAntiSnipingWindow ? "destructive" : "secondary"}>
+                <Badge
+                  variant={isClosed || isAntiSnipingWindow ? "destructive" : "secondary"}
+                  className={canPlaceBids ? "motion-safe:animate-pulse bg-accent-600 text-white" : undefined}
+                >
                   {isClosed
                     ? "Subasta Finalizada"
                     : !isSynced

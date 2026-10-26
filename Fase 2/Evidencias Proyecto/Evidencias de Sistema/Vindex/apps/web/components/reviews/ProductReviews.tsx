@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,7 @@ export default function ProductReviews({
   const [supabase] = useState(createClient);
   const { showToast } = useToast();
   const [userId, setUserId] = useState<string | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
@@ -48,17 +50,31 @@ export default function ProductReviews({
 
   useEffect(() => {
     let current = true;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!current) return;
+      setUserId(session?.user.id ?? null);
+      setIsAuthLoading(false);
+    });
+
+    return () => {
+      current = false;
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  useEffect(() => {
+    let current = true;
+    setLoading(true);
+    setLoadError(null);
+
     const load = async () => {
       try {
-        const [{ data: { user }, error: authError }, { data, error }] = await Promise.all([
-          supabase.auth.getUser(),
-          supabase.from("reviews").select("id, buyer_id, rating, comment, created_at").eq("product_id", productId).order("created_at", { ascending: false }),
-        ]);
-        if (authError) throw authError;
+        const { data, error } = await supabase.from("reviews")
+          .select("id, buyer_id, rating, comment, created_at")
+          .eq("product_id", productId)
+          .order("created_at", { ascending: false });
         if (error) throw error;
-        if (!current) return;
-        setUserId(user?.id ?? null);
-        setReviews((data ?? []) as Review[]);
+        if (current) setReviews((data ?? []) as Review[]);
       } catch (loadFailure) {
         const message = loadFailure instanceof Error ? loadFailure.message : "Error desconocido";
         if (current) setLoadError(message);
@@ -66,6 +82,7 @@ export default function ProductReviews({
         if (current) setLoading(false);
       }
     };
+
     void load();
     return () => {
       current = false;
@@ -73,6 +90,9 @@ export default function ProductReviews({
   }, [productId, supabase]);
 
   const existingReview = reviews.some((review) => review.buyer_id === userId);
+  const averageRating = reviews.length > 0
+    ? reviews.reduce((total, review) => total + review.rating, 0) / reviews.length
+    : 0;
   const canRateWinner = Boolean(
     isAuction &&
     auctionClosed &&
@@ -114,6 +134,14 @@ export default function ProductReviews({
         <CardDescription>Opiniones de compradores de esta publicación.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        {!loading && !loadError && reviews.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <RatingStars rating={averageRating} />
+            <span className="text-sm font-medium text-foreground">
+              {averageRating.toFixed(1)} · {reviews.length} {reviews.length === 1 ? "reseña" : "reseñas"}
+            </span>
+          </div>
+        )}
         {loading ? <p role="status" className="text-sm text-muted-foreground">Cargando reseñas...</p>
           : loadError ? <p role="alert" className="text-sm text-destructive">No se pudieron cargar las reseñas: {loadError}</p>
             : reviews.length === 0 ? <p className="text-sm text-muted-foreground">Aún no hay reseñas para esta publicación.</p>
@@ -147,6 +175,12 @@ export default function ProductReviews({
             </div>
             <Button type="submit" disabled={saving}>{saving ? "Enviando..." : "Enviar calificación"}</Button>
           </form>
+        )}
+        {isAuction && auctionClosed && winnerId && !isAuthLoading && !userId && (
+          <p className="border-t border-border pt-4 text-sm text-muted-foreground">
+            <Link href="/login" className="font-medium text-brand-700 hover:text-brand-800">Inicia sesión</Link>
+            {" "}con la cuenta ganadora para calificar al vendedor.
+          </p>
         )}
         {userId && existingReview && <p className="border-t border-border pt-4 text-sm text-muted-foreground">Ya enviaste una calificación para esta subasta.</p>}
         {!isAuction && <p className="border-t border-border pt-4 text-xs text-muted-foreground">Las calificaciones de productos estarán disponibles cuando el sistema confirme la compra y recepción del pedido.</p>}

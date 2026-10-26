@@ -10,7 +10,7 @@ Marketplace orientado al mercado chileno que combina:
 - Custodia de pagos
 - Validación física mediante OTP
 - Aplicación web
-- Aplicación móvil
+- Aplicación móvil.
 
 ---
 

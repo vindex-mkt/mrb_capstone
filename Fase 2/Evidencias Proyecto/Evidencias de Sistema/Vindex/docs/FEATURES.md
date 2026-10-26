@@ -19,11 +19,15 @@ Status: 🟡 En desarrollo
 
 - [x] Crear producto
 - [x] Editar publicaciones propias desde el perfil de vendedor
+- [x] Asignar o corregir la categoría de una publicación al editarla
+- [x] Filtrar productos por categoría desde la tienda y el menú de navegación
 - [x] Crear y renovar ofertas con vencimiento
+- [x] Consultar las ofertas activas en una página dedicada y abrir el detalle de cada producto
 - [x] Listar publicaciones activas ordenadas por fecha en la portada
 - [x] Mensajería entre compradores y vendedores para productos de compra directa
 - [x] Carrito sincronizado y persistido para productos de compra directa
 - [x] Checkout simulado con selección de dirección, envío y método de pago
+- [x] Destacar publicaciones desde el formulario de venta con pago simulado en un modal
 - [x] Historial de compras del comprador y calificación de productos comprados
 - [ ] Eliminar producto
 
@@ -32,6 +36,7 @@ Status: 🟡 En desarrollo
 ## Mensajería
 
 - [x] Iniciar o reutilizar una conversación desde el detalle de un producto de compra directa
+- [x] Abrir el acceso a mensajería desde las publicaciones recientes y solicitar login cuando sea necesario
 - [x] Listar conversaciones con el nombre de la otra parte y el producto asociado
 - [x] Cargar historial, enviar mensajes y recibir inserciones mediante Supabase Realtime
 - [x] Restringir el acceso a las conversaciones y mensajes mediante las políticas RLS existentes
@@ -57,6 +62,7 @@ Status: 🟡 Simulación disponible
 
 - [x] Métodos simulados Webpay Plus y Mercado Pago
 - [x] Creación de órdenes mediante la RPC `process_mock_checkout`
+- [x] Pago simulado de destacados desde el formulario de venta
 - [ ] Integración real de pasarela
 - [ ] Custodia
 - [ ] Liberación de fondos

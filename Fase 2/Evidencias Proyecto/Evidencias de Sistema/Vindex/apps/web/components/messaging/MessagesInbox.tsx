@@ -107,7 +107,6 @@ export default function MessagesInbox({
       if (!isCurrent) return;
       if (error) {
         console.error("No se pudo verificar la sesión de mensajería:", error);
-        showToast("No se pudo verificar tu sesión.", "error");
         setUserId(null);
       } else {
         setUserId(data.user?.id ?? null);

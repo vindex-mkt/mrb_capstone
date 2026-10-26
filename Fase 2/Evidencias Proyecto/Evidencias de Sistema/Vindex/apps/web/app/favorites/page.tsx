@@ -133,7 +133,7 @@ export default function FavoritesPage() {
           <div className="py-14 text-center">
             <p className="text-lg font-semibold text-foreground">Aún no tienes favoritos</p>
             <p className="mt-2 text-sm text-muted-foreground">Guarda productos con el corazón para encontrarlos aquí.</p>
-            <Link href="/shop" className="btn btn-primary mt-4 min-h-10 px-5">Explorar productos</Link>
+            <Link href="/tienda" className="btn btn-primary mt-4 min-h-10 px-5">Explorar productos</Link>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">

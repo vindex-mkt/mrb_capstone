@@ -48,6 +48,7 @@ export function AuctionCountdown({
   const remainingSeconds = useAuctionCountdown(endsAt);
   const isClosed = remainingSeconds === 0;
   const isUrgent = remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 180;
+  const isLive = remainingSeconds !== null && remainingSeconds > 0;
   const formatted = remainingSeconds === null ? null : formatCountdown(remainingSeconds);
   const hasValidEnd = Boolean(endsAt && Number.isFinite(new Date(endsAt).getTime()));
 
@@ -55,7 +56,8 @@ export function AuctionCountdown({
     <div className="flex flex-wrap items-center gap-2">
       {showStatus && (
         <Badge
-          variant={isUrgent || isClosed || !hasValidEnd ? "destructive" : "secondary"}
+          variant={isLive || isClosed || !hasValidEnd ? "destructive" : "secondary"}
+          className={isLive && !isUrgent ? "motion-safe:animate-pulse bg-accent-600 text-white" : undefined}
           aria-live="polite"
         >
           {isClosed
