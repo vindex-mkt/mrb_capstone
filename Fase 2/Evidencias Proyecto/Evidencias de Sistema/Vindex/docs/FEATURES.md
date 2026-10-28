@@ -63,6 +63,11 @@ Status: 🟡 Simulación disponible
 - [x] Métodos simulados Webpay Plus y Mercado Pago
 - [x] Creación de órdenes mediante la RPC `process_mock_checkout`
 - [x] Pago simulado de destacados desde el formulario de venta
+- [x] Consulta de saldo disponible y congelado de la billetera en web
+- [x] Accesos a billetera y operaciones desde el navbar de escritorio y móvil
+- [x] Simulación de recarga con selección de Webpay Plus o Mercado Pago
+- [ ] Recargas reales de billetera
+- [ ] Solicitudes y desembolsos de retiros
 - [ ] Integración real de pasarela
 - [ ] Custodia
 - [ ] Liberación de fondos

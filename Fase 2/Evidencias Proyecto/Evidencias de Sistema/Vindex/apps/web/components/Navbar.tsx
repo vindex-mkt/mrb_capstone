@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 import { ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import CartNavButton from "@/components/cart/CartNavButton";
+import WalletNavButton from "@/components/wallet/WalletNavButton";
 import { useFavorites } from "@/hooks/useFavorites";
 import {
   IconHeart,
@@ -206,6 +207,8 @@ export default function Navbar() {
                 {favoriteCount > 0 && <span className="count-badge">{favoriteCount > 99 ? "99+" : favoriteCount}</span>}
               </Link>
 
+              <WalletNavButton />
+
               <CartNavButton />
 
               <Link
@@ -217,6 +220,7 @@ export default function Navbar() {
                 <IconPlus className="h-4 w-4" aria-hidden="true" />
                 <span className="hidden sm:inline">Vender</span>
               </Link>
+
             </div>
           </div>
 

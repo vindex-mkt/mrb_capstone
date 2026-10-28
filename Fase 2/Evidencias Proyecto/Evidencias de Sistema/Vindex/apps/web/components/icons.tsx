@@ -77,6 +77,16 @@ export function IconCart(props: IconProps) {
   );
 }
 
+export function IconWallet(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M20 8V5a2 2 0 0 0-2-2H5a3 3 0 0 0 0 6h15v10a2 2 0 0 1-2 2H5a3 3 0 0 1-3-3V6" />
+      <path d="M20 12h-4a2 2 0 0 0 0 4h4" />
+      <path d="M16 14h.01" />
+    </Svg>
+  );
+}
+
 export function IconUser(props: IconProps) {
   return (
     <Svg {...props}>
