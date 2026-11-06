@@ -1,6 +1,16 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  "globalEnv": ["NEXT_PUBLIC_SITE_URL"],
+  "globalPassThroughEnv": [
+    "NODE_ENV",
+    "TRANSBANK_ENV",
+    "TRANSBANK_API_KEY",
+    "TRANSBANK_COMMERCE_CODE",
+    "TRANSBANK_CHILD_COMMERCE_CODE_1",
+    "TRANSBANK_CHILD_COMMERCE_CODE_2",
+    "SUPABASE_SERVICE_ROLE_KEY"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

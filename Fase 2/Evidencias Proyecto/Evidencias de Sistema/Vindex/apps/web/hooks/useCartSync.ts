@@ -13,6 +13,7 @@ type CartProduct = {
   stock: number | null;
   images: string[] | null;
   seller_id: string;
+  store_id: number | null;
   sale_type: string | null;
   status: boolean | string | null;
   offer_ends_at: string | null;
@@ -25,7 +26,7 @@ type JoinedCartItem = {
 };
 
 const productFields =
-  "id, name, price, discount_price, stock, images, seller_id, sale_type, status, offer_ends_at";
+  "id, name, price, discount_price, stock, images, seller_id, store_id, sale_type, status, offer_ends_at";
 const fallbackImage = "https://picsum.photos/seed/vindex-product/600/600";
 
 const toCartItem = (product: CartProduct, quantity: number): CartItem | null => {
@@ -54,6 +55,7 @@ const toCartItem = (product: CartProduct, quantity: number): CartItem | null => 
     quantity: Math.min(Math.max(Math.floor(quantity), 0), stock),
     stock,
     seller_id: product.seller_id,
+    store_id: product.store_id,
   };
 };
 

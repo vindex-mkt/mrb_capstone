@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { formatProductPrice } from "@/lib/formatters";
 import { useCartStore } from "@/lib/store/useCartStore";
-import { useToast } from "@/components/ToastProvider";
+import { getMerchantKey, MAX_CART_MERCHANTS_MESSAGE } from "@/lib/checkout/merchant";
 
 type Address = {
   region: string;
@@ -19,12 +19,6 @@ type Address = {
   commune: string;
   street: string;
   street_number: string;
-};
-
-type CheckoutResponse = {
-  success?: boolean;
-  message?: string;
-  order_id?: number | string;
 };
 
 const emptyAddress: Address = {
@@ -50,16 +44,13 @@ const getCheckoutErrorMessage = (error: unknown) => {
 export default function CheckoutForm() {
   const router = useRouter();
   const [supabase] = useState(createClient);
-  const { showToast } = useToast();
   const items = useCartStore((state) => state.items);
   const hasHydrated = useCartStore((state) => state.hasHydrated);
-  const clearCart = useCartStore((state) => state.clearCart);
   const subtotal = useCartStore((state) => state.getTotal());
   const [profileAddress, setProfileAddress] = useState<Address | null>(null);
   const [address, setAddress] = useState<Address>(emptyAddress);
   const [addressChoice, setAddressChoice] = useState<"saved" | "new">("new");
   const [shipping, setShipping] = useState<"standard" | "pickup">("standard");
-  const [paymentMethod, setPaymentMethod] = useState<"webpay" | "mercadopago">("webpay");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -114,6 +105,9 @@ export default function CheckoutForm() {
   const total = useMemo(() => subtotal + shippingCost, [shippingCost, subtotal]);
   const selectedAddress = addressChoice === "saved" && profileAddress ? profileAddress : address;
   const addressIsValid = shipping === "pickup" || isCompleteAddress(selectedAddress);
+  const merchantKeys = items.map(getMerchantKey);
+  const exceedsMerchantLimit =
+    merchantKeys.some((key) => key === null) || new Set(merchantKeys).size > 2;
 
   const updateAddress = (field: keyof Address, value: string) => {
     setAddress((currentAddress) => ({ ...currentAddress, [field]: value }));
@@ -124,6 +118,10 @@ export default function CheckoutForm() {
     setErrorMessage(null);
     if (!hasHydrated || items.length === 0) {
       setErrorMessage("Tu carrito está vacío o todavía se está cargando.");
+      return;
+    }
+    if (exceedsMerchantLimit) {
+      setErrorMessage(MAX_CART_MERCHANTS_MESSAGE);
       return;
     }
     if (!addressIsValid) {
@@ -137,26 +135,39 @@ export default function CheckoutForm() {
 
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.rpc("process_mock_checkout", {
-        p_shipping_address: shippingAddress,
-        p_shipping_cost: shippingCost,
-        p_payment_method: paymentMethod,
+      const response = await fetch("/api/payments/webpay/initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shippingAddress,
+          shippingMethod: shipping,
+        }),
       });
-      if (error) {
-        console.error("Falló process_mock_checkout:", error);
-        throw new Error(getCheckoutErrorMessage(error));
+      const result = await response.json() as {
+        message?: unknown;
+        paymentUrl?: unknown;
+        token?: unknown;
+      };
+      if (
+        !response.ok
+        || typeof result.paymentUrl !== "string"
+        || typeof result.token !== "string"
+      ) {
+        throw new Error(
+          typeof result.message === "string" ? result.message : "No se pudo iniciar el pago con Transbank.",
+        );
       }
 
-      const result = data as CheckoutResponse | null;
-      if (!result?.success || result.order_id === undefined || result.order_id === null) {
-        throw new Error(result?.message ?? "No se pudo procesar la compra.");
-      }
-
-      clearCart();
-      if (shipping === "pickup") {
-        showToast("Tu compra se realizó. El código OTP estará disponible en Mis Compras de tu perfil.", "success");
-      }
-      router.push(`/checkout/success?order_id=${encodeURIComponent(String(result.order_id))}`);
+      const paymentForm = document.createElement("form");
+      paymentForm.method = "POST";
+      paymentForm.action = result.paymentUrl;
+      const tokenInput = document.createElement("input");
+      tokenInput.type = "hidden";
+      tokenInput.name = "token_ws";
+      tokenInput.value = result.token;
+      paymentForm.appendChild(tokenInput);
+      document.body.appendChild(paymentForm);
+      paymentForm.submit();
     } catch (checkoutError) {
       const message = getCheckoutErrorMessage(checkoutError);
       setErrorMessage(`No se pudo completar la compra: ${message}`);
@@ -208,6 +219,11 @@ export default function CheckoutForm() {
         {errorMessage && (
           <p role="alert" className="mb-6 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
             {errorMessage}
+          </p>
+        )}
+        {exceedsMerchantLimit && (
+          <p role="alert" className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            {MAX_CART_MERCHANTS_MESSAGE}
           </p>
         )}
 
@@ -305,17 +321,16 @@ export default function CheckoutForm() {
             <Card className="border-border bg-surface">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg"><CreditCard className="size-5 text-brand-700" />3. Medio de pago</CardTitle>
-                <CardDescription>Selecciona una opción. No se realizará ningún cargo real.</CardDescription>
+                <CardDescription>Pago de prueba. Este checkout utiliza exclusivamente el ambiente de integración de Transbank.</CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-2">
-                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-4 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/70">
-                  <input type="radio" name="payment" checked={paymentMethod === "webpay"} onChange={() => setPaymentMethod("webpay")} className="accent-brand-600" />
-                  <span><span className="block font-semibold text-foreground">Webpay Plus</span><span className="text-sm text-muted-foreground">Transbank · Simulado</span></span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-4 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/70">
-                  <input type="radio" name="payment" checked={paymentMethod === "mercadopago"} onChange={() => setPaymentMethod("mercadopago")} className="accent-brand-600" />
-                  <span><span className="block font-semibold text-foreground">Mercado Pago</span><span className="text-sm text-muted-foreground">Simulado</span></span>
-                </label>
+              <CardContent>
+                <div className="flex items-center gap-3 rounded-xl border border-brand-600 bg-brand-50/70 p-4">
+                  <CreditCard className="size-5 shrink-0 text-brand-700" aria-hidden="true" />
+                  <span>
+                    <span className="block font-semibold text-foreground">Webpay Plus Mall</span>
+                    <span className="text-sm text-muted-foreground">Transbank · Integración (sandbox)</span>
+                  </span>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -344,10 +359,10 @@ export default function CheckoutForm() {
                   <div className="flex justify-between gap-3"><span className="text-muted-foreground">Envío</span><span className="font-medium text-foreground">{formatProductPrice(shippingCost)}</span></div>
                   <div className="flex justify-between gap-3 border-t border-border pt-3 text-base"><span className="font-semibold text-foreground">Total</span><span className="font-extrabold text-foreground">{formatProductPrice(total)}</span></div>
                 </div>
-                <Button type="submit" className="mt-5 h-11 w-full bg-brand-600 text-white hover:bg-brand-700" disabled={submitting || !addressIsValid}>
-                  {submitting ? "Procesando compra..." : "Pagar ahora (Simulación)"}
+                <Button type="submit" className="mt-5 h-11 w-full bg-brand-600 text-white hover:bg-brand-700" disabled={submitting || !addressIsValid || exceedsMerchantLimit}>
+                  {submitting ? "Conectando con Transbank..." : "Pagar con Webpay"}
                 </Button>
-                <p className="mt-3 text-center text-xs text-muted-foreground">El pago es una simulación y no se solicitarán datos de tarjeta.</p>
+                <p className="mt-3 text-center text-xs text-muted-foreground">Se usarán exclusivamente credenciales y tarjetas de prueba; no se realizarán cobros reales.</p>
               </CardContent>
             </Card>
           </aside>

@@ -7,11 +7,12 @@ import { useCartStore } from "@/lib/store/useCartStore";
 import { getProductImage, type ProductListing } from "@/lib/product-utils";
 import { useToast } from "@/components/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
+import { MAX_CART_MERCHANTS_MESSAGE } from "@/lib/checkout/merchant";
 
 type ProductPurchaseButtonProps = {
   product: Pick<
     ProductListing,
-    "id" | "name" | "price" | "stock" | "images" | "seller_id" | "sale_type"
+    "id" | "name" | "price" | "stock" | "images" | "seller_id" | "store_id" | "sale_type"
   >;
   currentPrice: number | null;
   action?: "add" | "buy";
@@ -40,8 +41,12 @@ export default function ProductPurchaseButton({ product, currentPrice, action = 
       quantity: 1,
       stock,
       seller_id: product.seller_id,
+      store_id: product.store_id,
     };
-    addItem(cartItem);
+    if (!addItem(cartItem)) {
+      showToast(MAX_CART_MERCHANTS_MESSAGE, "error");
+      return;
+    }
     setWasAdded(true);
     if (action === "add") return;
 

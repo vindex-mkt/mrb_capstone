@@ -26,7 +26,7 @@ Status: 🟡 En desarrollo
 - [x] Listar publicaciones activas ordenadas por fecha en la portada
 - [x] Mensajería entre compradores y vendedores para productos de compra directa
 - [x] Carrito sincronizado y persistido para productos de compra directa
-- [x] Checkout simulado con selección de dirección, envío y método de pago
+- [x] Checkout Webpay Plus Mall en sandbox con máximo dos comercios vendedores por compra
 - [x] Destacar publicaciones desde el formulario de venta con pago simulado en un modal
 - [x] Historial de compras del comprador y calificación de productos comprados
 - [ ] Eliminar producto
@@ -58,17 +58,22 @@ Status: 🔴 Pendiente
 
 ## Pagos
 
-Status: 🟡 Simulación disponible
+Status: 🟡 Integración sandbox disponible; requiere configurar y aplicar la migración de Supabase
 
-- [x] Métodos simulados Webpay Plus y Mercado Pago
-- [x] Creación de órdenes mediante la RPC `process_mock_checkout`
+- [x] Checkout Webpay Plus Mall de integración, sin cobros reales
+- [x] Creación de órdenes y subtransacciones desde el servidor con validación de stock y comercios
+- [x] Confirmación individual de subtransacciones y estados para pagos aprobados, parciales y rechazados
+- [x] Límite de dos comercios vendedores distintos en frontend y servidor
+- [x] Bloqueo del uso de `process_mock_checkout` por clientes
 - [x] Pago simulado de destacados desde el formulario de venta
 - [x] Consulta de saldo disponible y congelado de la billetera en web
 - [x] Accesos a billetera y operaciones desde el navbar de escritorio y móvil
 - [x] Simulación de recarga con selección de Webpay Plus o Mercado Pago
 - [ ] Recargas reales de billetera
 - [ ] Solicitudes y desembolsos de retiros
-- [ ] Integración real de pasarela
+- [ ] Integración productiva de pasarela (el checkout actual solo usa credenciales de integración)
 - [ ] Custodia
 - [ ] Liberación de fondos
 - [ ] Comisión
+
+La configuración del entorno, la migración requerida y los casos de prueba están documentados en [WEBPAY_PLUS_MALL.md](./WEBPAY_PLUS_MALL.md).

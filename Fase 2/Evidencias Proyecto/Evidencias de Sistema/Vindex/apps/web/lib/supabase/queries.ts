@@ -1,5 +1,4 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createSupabaseServerClient } from "./server";
 export { formatProductPrice } from "../formatters";
 import { formatAuctionBid, type AuctionBid, type AuctionProduct, type ProductListing } from "../product-utils";
 export type { ProductListing } from "../product-utils";
@@ -13,27 +12,6 @@ export type StoreListing = {
 	average_rating: number | null;
 	total_reviews: number;
 };
-
-async function createSupabaseServerClient() {
-	const cookieStore = await cookies();
-
-	return createServerClient(
-		process.env.NEXT_PUBLIC_SUPABASE_URL!,
-		process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-		{
-			cookies: {
-				getAll: () => cookieStore.getAll(),
-				setAll: (cookiesToSet) => {
-					try {
-						cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
-					} catch {
-						// Server components cannot write cookies during rendering.
-					}
-				},
-			},
-		},
-	);
-}
 
 const logQueryError = (section: string, message: string) => {
 	console.error(`No se pudieron cargar ${section}: ${message}`);

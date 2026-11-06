@@ -60,6 +60,7 @@ El tipo `CartItem` de [`useCartStore.ts`](../apps/web/lib/store/useCartStore.ts)
 | `quantity: number` | Unidades seleccionadas, limitada por el stock conocido. |
 | `stock: number` | Stock conocido al construir o refrescar el artículo. |
 | `seller_id: string` | UUID del vendedor. |
+| `store_id: number | null` | Identificador de la tienda, o `null` para venta personal. |
 
 `cart_id`, a diferencia de `product_id`, es el UUID que identifica el carrito remoto. El artículo del store usa el ID numérico del producto como identidad local; no guarda el UUID del carrito en cada fila.
 
@@ -80,7 +81,7 @@ El store usa `skipHydration: true`. El hook de sincronización llama explícitam
 
 Todas estas operaciones se implementan centralmente en [`useCartStore.ts`](../apps/web/lib/store/useCartStore.ts):
 
-- **`addItem(item)`**: ignora el alta si el stock es cero. Si el producto ya existe, incrementa su cantidad sin superar el stock recibido y actualiza los datos del artículo con el producto recibido. Si es nuevo, limita la cantidad al stock. Abre el drawer.
+- **`addItem(item)`**: ignora el alta si el stock es cero o si el artículo no tiene identidad verificable. Limita el carrito a dos comercios lógicos (`store:<store_id>` o `seller:<seller_id>`); los productos de la misma tienda cuentan una sola vez. Si el producto ya existe, incrementa su cantidad sin superar el stock recibido. Quitar todos los artículos de un comercio libera su espacio. Abre el drawer cuando agrega el artículo.
 - **`removeItem(productId)`**: elimina el producto cuyo `id` coincide con el ID numérico indicado.
 - **`updateQuantity(productId, quantity)`**: normaliza la cantidad a entero y la limita entre cero y stock. Una cantidad resultante de cero elimina el artículo.
 - **`clearCart()`**: vacía los artículos.
@@ -94,9 +95,9 @@ Estos cálculos son de presentación del carrito. Antes de una futura compra, el
 
 ## Checkout y compras
 
-La ruta `/checkout` requiere una sesión autenticada y muestra los artículos hidratados del carrito. El comprador puede elegir la dirección completa guardada en `profiles` o proporcionar otra para el pedido. El envío estándar cuesta CLP 3.990 y el retiro en tienda CLP 0; estos importes y la elección entre Webpay Plus y Mercado Pago son simulaciones, no integraciones con proveedores.
+La ruta `/checkout` requiere sesión autenticada. El envío estándar cuesta CLP 3.990 y el retiro cuesta CLP 0. El pago se inicia por `POST /api/payments/webpay/initiate` y usa exclusivamente Webpay Plus Mall en integración. El servidor relee el carrito, confirma vendedores, precios y stock en Supabase, y rechaza el límite de dos comercios incluso si se altera la solicitud. El comprador se redirige al formulario seguro de Transbank y el retorno se confirma con `MallTransaction.commit`; volver a Vindex no es suficiente para marcar una orden como pagada.
 
-Al confirmar, el cliente invoca `process_mock_checkout` con la dirección y el método de pago permitido (`webpay` o `mercadopago`). La RPC calcula y crea la orden y sus ítems a partir del carrito remoto, y vacía ese carrito dentro de la operación. En caso de éxito, el navegador también vacía su store local y abre `/checkout/success?order_id=...`. El detalle y el historial se consultan bajo las políticas RLS de `orders` y `order_items`.
+La cesta local y la remota se conservan hasta conocer el resultado. Tras una autorización completa se quitan las cantidades pagadas; ante autorización parcial solo se quitan las cantidades autorizadas y no se hace reembolso automático. Las órdenes y cada subtransacción quedan auditadas en `payment_transactions` y `payment_subtransactions`. Configuración, estados y escenarios de prueba están documentados en [WEBPAY_PLUS_MALL.md](./WEBPAY_PLUS_MALL.md).
 
 La RPC debe localizar el carrito mediante `cart_items.cart_id → carts.id → carts.user_id`; `cart_items` no tiene una columna `user_id`. La migración de corrección [`20261015195500_fix_mock_checkout_cart_lookup.sql`](../supabase/migrations/20261015195500_fix_mock_checkout_cart_lookup.sql) actualiza la función ya desplegada.
 

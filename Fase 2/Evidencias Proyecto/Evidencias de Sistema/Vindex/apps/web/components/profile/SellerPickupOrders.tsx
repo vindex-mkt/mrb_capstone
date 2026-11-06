@@ -106,7 +106,9 @@ export default function SellerPickupOrders() {
         return;
       }
 
-      const pickupOrders = ((orderRows ?? []) as Order[]).filter(isPickupOrder);
+      const pickupOrders = ((orderRows ?? []) as Order[]).filter((order) =>
+        isPickupOrder(order) && ["paid", "completed", "delivered"].includes(order.status.toLowerCase()),
+      );
       if (pickupOrders.length === 0) {
         setLoading(false);
         return;

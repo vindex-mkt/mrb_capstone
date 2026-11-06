@@ -94,7 +94,9 @@ export default function BuyerPurchases() {
       }
 
       const loadedOrders = (orders ?? []) as Order[];
-      const pickupOrders = loadedOrders.filter(isPickupOrder);
+      const pickupOrders = loadedOrders.filter((order) =>
+        isPickupOrder(order) && ["paid", "completed", "delivered"].includes(order.status.toLowerCase()),
+      );
       const codeResults = await Promise.all(pickupOrders.map((order) => supabase.rpc(
         "get_buyer_delivery_code",
         { p_order_id: order.id },
@@ -229,9 +231,10 @@ export default function BuyerPurchases() {
             {items.map((item, index) => {
               const pickupOrder = isPickupOrder(item.order);
               const deliveryCompleted = item.order.delivery_status === "completed";
+              const paymentConfirmed = ["paid", "completed", "delivered"].includes(item.order.status.toLowerCase());
               const canRate = (pickupOrder
-                ? deliveryCompleted
-                : ["completed", "delivered"].includes(item.order.status.toLowerCase())) && item.product_id !== null;
+                ? paymentConfirmed && deliveryCompleted
+                : ["paid", "completed", "delivered"].includes(item.order.status.toLowerCase())) && item.product_id !== null;
               const hasRated = item.product_id !== null && ratedProductIds.has(item.product_id);
               const isFirstOrderItem = items.findIndex((purchase) => purchase.order.id === item.order.id) === index;
               const deliveryCode = deliveryCodes[item.order.id];
@@ -248,10 +251,12 @@ export default function BuyerPurchases() {
                     <p className="mt-1 text-sm text-muted-foreground">Pedido #{item.order.id} · {new Date(item.order.created_at).toLocaleDateString("es-CL")}</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {item.quantity} × {formatProductPrice(Number(item.unit_price))} · Estado: {pickupOrder
-                        ? deliveryCompleted ? "Entregado" : "Pendiente de retiro"
+                        ? !paymentConfirmed
+                          ? item.order.status === "partially_paid" ? "Pago parcialmente autorizado" : "Pago pendiente o rechazado"
+                          : deliveryCompleted ? "Entregado" : "Pendiente de retiro"
                         : item.order.status}
                     </p>
-                    {pickupOrder && isFirstOrderItem && (
+                    {pickupOrder && paymentConfirmed && isFirstOrderItem && (
                       <div className={`mt-4 rounded-xl border p-4 ${deliveryCompleted ? "border-emerald-200 bg-emerald-50" : "border-brand-200 bg-brand-50/70"}`}>
                         {deliveryCompleted ? (
                           <p className="font-semibold text-emerald-800">Retiro presencial completado</p>

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { canAddMerchantToCart } from "@/lib/checkout/merchant";
 
 export type CartItem = {
   id: number;
@@ -9,6 +10,7 @@ export type CartItem = {
   quantity: number;
   stock: number;
   seller_id: string;
+  store_id: number | null;
 };
 
 type CartStore = {
@@ -16,7 +18,7 @@ type CartStore = {
   isOpen: boolean;
   hasHydrated: boolean;
   cartOwnerId: string | null;
-  addItem: (item: CartItem) => void;
+  addItem: (item: CartItem) => boolean;
   removeItem: (productId: number) => void;
   updateQuantity: (productId: number, quantity: number) => void;
   clearCart: () => void;
@@ -40,7 +42,10 @@ export const useCartStore = create<CartStore>()(
       cartOwnerId: null,
       addItem: (item) => {
         const stock = Math.max(Math.floor(item.stock), 0);
-        if (stock === 0) return;
+        if (stock === 0) return false;
+
+        const currentItems = get().items;
+        if (!canAddMerchantToCart(currentItems, item)) return false;
 
         set((state) => {
           const existingItem = state.items.find(({ id }) => id === item.id);
@@ -64,6 +69,7 @@ export const useCartStore = create<CartStore>()(
             isOpen: true,
           };
         });
+        return true;
       },
       removeItem: (productId) =>
         set((state) => ({ items: state.items.filter(({ id }) => id !== productId) })),
