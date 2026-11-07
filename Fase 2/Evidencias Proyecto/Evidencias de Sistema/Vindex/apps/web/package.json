@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "check-types": "next typegen && tsc --noEmit",
-    "test:checkout": "node --experimental-strip-types --test lib/checkout/merchant.test.mts lib/checkout/payment-validation.test.mts"
+    "test:checkout": "node --experimental-strip-types --test lib/checkout/merchant.test.mts lib/checkout/payment-validation.test.mts lib/checkout/advertising-validation.test.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

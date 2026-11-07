@@ -12,6 +12,29 @@ export { isRecord } from "./record";
 export const RETURN_TOKEN_COOKIE = "vindex_webpay_return_token";
 export const CANCEL_TOKEN_COOKIE = "vindex_webpay_cancel_token";
 
+export const createAdvertisingTransaction = () => {
+  const environment = process.env.TRANSBANK_ENV?.trim().toLowerCase();
+  const apiKey = process.env.TRANSBANK_API_KEY;
+  const mallCommerceCode = process.env.TRANSBANK_COMMERCE_CODE;
+  const childCommerceCode1 = process.env.TRANSBANK_CHILD_COMMERCE_CODE_1;
+  const childCommerceCode2 = process.env.TRANSBANK_CHILD_COMMERCE_CODE_2;
+
+  if (
+    !["integration", "sandbox"].includes(environment ?? "")
+    || apiKey !== IntegrationApiKeys.WEBPAY
+    || mallCommerceCode !== IntegrationCommerceCodes.WEBPAY_PLUS_MALL
+    || childCommerceCode1 !== IntegrationCommerceCodes.WEBPAY_PLUS_MALL_CHILD1
+    || childCommerceCode2 !== IntegrationCommerceCodes.WEBPAY_PLUS_MALL_CHILD2
+  ) {
+    throw new Error("La publicidad solo puede cobrarse con las credenciales de integración de Transbank.");
+  }
+
+  return WebpayPlus.Transaction.buildForIntegration(
+    IntegrationCommerceCodes.WEBPAY_PLUS,
+    apiKey,
+  );
+};
+
 export const createMallTransaction = () => {
   const environment = process.env.TRANSBANK_ENV?.trim().toLowerCase();
   const apiKey = process.env.TRANSBANK_API_KEY;

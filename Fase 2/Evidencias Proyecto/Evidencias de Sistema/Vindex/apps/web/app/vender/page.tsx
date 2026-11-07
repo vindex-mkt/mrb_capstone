@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, CircleHelp, CreditCard, ImagePlus, Sparkles, UploadCloud, X } from "lucide-react";
+import { CircleHelp, ImagePlus, Sparkles, UploadCloud, X } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
+import { featuredPlans, startAdvertisingPayment } from "@/lib/advertising";
 
 type SelectedImage = {
 	file: File;
@@ -30,20 +32,8 @@ type StoreCategory = { id: number; name: string };
 
 const numberInputClassName = "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 
-const featuredPlans = [
-	{ days: 1, price: 1990 },
-	{ days: 3, price: 4990 },
-	{ days: 7, price: 9990 },
-	{ days: 14, price: 16990 },
-] as const;
-
 const formatClp = (value: number) =>
 	new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(value);
-
-const paymentMethodLabels = {
-	webpay: "Webpay Plus",
-	mercadopago: "Mercado Pago",
-} as const;
 
 const SelectedImageList = memo(function SelectedImageList({
 	images,
@@ -211,6 +201,7 @@ const createSlugSuffix = () => {
 
 export default function SellProductPage() {
 	const router = useRouter();
+	const { showToast } = useToast();
 	const [supabase] = useState(createClient);
 	const [authorized, setAuthorized] = useState(false);
 	const [name, setName] = useState("");
@@ -224,6 +215,7 @@ export default function SellProductPage() {
 	const [offerDurationHours, setOfferDurationHours] = useState("24");
 	const [customOfferDurationHours, setCustomOfferDurationHours] = useState("24");
 	const [featuredDurationDays, setFeaturedDurationDays] = useState("7");
+	const [featuredSelected, setFeaturedSelected] = useState(false);
 	const [stock, setStock] = useState("1");
 	const [condition, setCondition] = useState("Nuevo");
 	const [categoryId, setCategoryId] = useState("");
@@ -244,20 +236,10 @@ export default function SellProductPage() {
 	const imagePreviewUrls = useRef(new Set<string>());
 	const [isAuction, setIsAuction] = useState(false);
 	const [showFeaturedInfo, setShowFeaturedInfo] = useState(false);
-	const [showFeaturedPayment, setShowFeaturedPayment] = useState(false);
-	const [featuredPaymentMethod, setFeaturedPaymentMethod] = useState<"webpay" | "mercadopago">("webpay");
-	const [featuredProcessing, setFeaturedProcessing] = useState(false);
-	const [featuredPaymentError, setFeaturedPaymentError] = useState<string | null>(null);
-	const [featuredPurchase, setFeaturedPurchase] = useState<{
-		days: number;
-		amount: number;
-		paymentMethod: "webpay" | "mercadopago";
-	} | null>(null);
 	const [shippingAvailable, setShippingAvailable] = useState(true);
 	const [isPublished, setIsPublished] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
-	const [successMessage, setSuccessMessage] = useState<string | null>(null);
 	const slug = name.trim() && slugSuffix ? `${toSlug(name)}-${slugSuffix}` : "";
 	const activePrice = isAuction ? startingPrice : price;
 	const formattedPrice = activePrice
@@ -414,37 +396,9 @@ export default function SellProductPage() {
 		setSelectedImages((currentImages) => currentImages.filter((image) => image.previewUrl !== previewUrl));
 	}, []);
 
-	const openFeaturedPayment = () => {
-		setFeaturedPaymentMethod("webpay");
-		setFeaturedPaymentError(null);
-		setShowFeaturedPayment(true);
-	};
-
-	const handleFeaturedPayment = async () => {
-		if (featuredProcessing) return;
-
-		setFeaturedPaymentError(null);
-		setFeaturedProcessing(true);
-		try {
-			// El destacado se cobra con una simulación local, igual que el checkout del carrito.
-			await new Promise((resolve) => setTimeout(resolve, 900));
-			setFeaturedPurchase({
-				days: selectedFeaturedPlan.days,
-				amount: selectedFeaturedPlan.price,
-				paymentMethod: featuredPaymentMethod,
-			});
-			setShowFeaturedPayment(false);
-		} catch {
-			setFeaturedPaymentError("No se pudo completar el pago simulado. Intenta nuevamente.");
-		} finally {
-			setFeaturedProcessing(false);
-		}
-	};
-
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		setErrorMessage(null);
-		setSuccessMessage(null);
 
 		if (invalidPrice) {
 			setErrorMessage("Ingresa un precio válido para la publicación.");
@@ -478,6 +432,8 @@ export default function SellProductPage() {
 		}
 
 		setSaving(true);
+		const promoteAfterPublish = isPublished && featuredSelected;
+		const promotionDurationDays = selectedFeaturedPlan.days;
 
 		try {
 			const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -502,10 +458,8 @@ export default function SellProductPage() {
 				offer_ends_at: parsedDiscountPrice !== null
 					? new Date(now.getTime() + parsedOfferDurationHours * 60 * 60 * 1000).toISOString()
 					: null,
-				is_featured: featuredPurchase !== null,
-				featured_until: featuredPurchase !== null
-					? new Date(now.getTime() + featuredPurchase.days * 24 * 60 * 60 * 1000).toISOString()
-					: null,
+				is_featured: false,
+				featured_until: null,
 				stock: Number(stock),
 				condition,
 				status: isPublished,
@@ -541,9 +495,6 @@ export default function SellProductPage() {
 				if (imagesUpdateError) imageErrors.push(`No se pudieron guardar las URLs en el producto: ${imagesUpdateError.message}`);
 			}
 
-			setSuccessMessage(imageErrors.length > 0
-				? "El producto se publicó, pero algunas imágenes no pudieron procesarse."
-				: "El producto se publicó correctamente.");
 			if (imageErrors.length > 0) setErrorMessage(imageErrors.join(" "));
 			setName("");
 			setSlugSuffix(createSlugSuffix());
@@ -556,11 +507,7 @@ export default function SellProductPage() {
 			setOfferDurationHours("24");
 			setCustomOfferDurationHours("24");
 			setFeaturedDurationDays("7");
-			setFeaturedPurchase(null);
-			setShowFeaturedPayment(false);
-			setFeaturedProcessing(false);
-			setFeaturedPaymentError(null);
-			setFeaturedPaymentMethod("webpay");
+			setFeaturedSelected(false);
 			setStock("1");
 			setCondition("Nuevo");
 			setCategoryId("");
@@ -574,6 +521,21 @@ export default function SellProductPage() {
 			setIsAuction(false);
 			setShippingAvailable(true);
 			setIsPublished(true);
+			showToast(imageErrors.length > 0
+				? "El producto se publicó, pero algunas imágenes no pudieron procesarse."
+				: "El producto se publicó correctamente.", "success");
+
+			if (promoteAfterPublish) {
+				try {
+					await startAdvertisingPayment(product.id, promotionDurationDays);
+				} catch (paymentError) {
+					const message = paymentError instanceof Error
+						? paymentError.message
+						: "No se pudo iniciar el pago de publicidad.";
+					setErrorMessage(`El producto ya está publicado y seguirá activo sin destacar. ${message}`);
+					showToast("Producto publicado; publicidad pendiente de pago.", "error");
+				}
+			}
 		} catch (error) {
 			setErrorMessage(error instanceof Error ? error.message : "No se pudo publicar el producto.");
 		} finally {
@@ -597,7 +559,6 @@ export default function SellProductPage() {
 			</div>
 
 			{errorMessage && <p role="alert" className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">{errorMessage}</p>}
-			{successMessage && <p role="status" className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">{successMessage}</p>}
 
 			<div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
 				<section aria-labelledby="product-form-title" className="min-w-0">
@@ -732,8 +693,8 @@ export default function SellProductPage() {
 									<TabsContent value="featured" className="space-y-4 pt-4">
 										<div className="flex items-center justify-between gap-2">
 											<div>
-												<h2 className="text-sm font-semibold text-foreground">Promoción pagada</h2>
-												<p className="text-xs text-muted-foreground">Elige cuánto tiempo destacar el producto.</p>
+												<h2 className="text-sm font-semibold text-foreground">Publicidad del producto</h2>
+												<p className="text-xs text-muted-foreground">Se cobrará con Webpay solo después de publicar correctamente.</p>
 											</div>
 											<Button type="button" variant="ghost" size="icon" aria-label="Cómo funcionan los destacados" onClick={() => setShowFeaturedInfo(true)}>
 												<CircleHelp className="h-4 w-4" aria-hidden="true" />
@@ -741,7 +702,7 @@ export default function SellProductPage() {
 										</div>
 										<div className="space-y-2">
 											<Label htmlFor="featuredDuration">Duración del destacado</Label>
-											<select id="featuredDuration" value={featuredDurationDays} onChange={(event) => setFeaturedDurationDays(event.target.value)} disabled={featuredPurchase !== null} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm disabled:opacity-60">
+											<select id="featuredDuration" value={featuredDurationDays} onChange={(event) => setFeaturedDurationDays(event.target.value)} disabled={featuredSelected} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm disabled:opacity-60">
 												{featuredPlans.map((plan) => (
 													<option key={plan.days} value={plan.days}>
 														{plan.days === 1 ? "1 día" : `${plan.days} días`} — {formatClp(plan.price)}
@@ -749,27 +710,22 @@ export default function SellProductPage() {
 												))}
 											</select>
 										</div>
-										{featuredPurchase ? (
+										{featuredSelected ? (
 											<div role="status" className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
-												<p className="flex items-center gap-2 font-semibold">
-													<BadgeCheck className="h-4 w-4" aria-hidden="true" />
-													Destacado pagado · {featuredPurchase.days} {featuredPurchase.days === 1 ? "día" : "días"}
-												</p>
-												<p className="mt-1 text-xs">
-													{formatClp(featuredPurchase.amount)} · {paymentMethodLabels[featuredPurchase.paymentMethod]} (simulado)
-												</p>
-												<p className="mt-1 text-xs">Se activará al publicar el producto.</p>
-												<Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setFeaturedPurchase(null)}>
-													Quitar destacado
+												<p className="font-semibold">Publicidad seleccionada · {selectedFeaturedPlan.days} {selectedFeaturedPlan.days === 1 ? "día" : "días"}</p>
+												<p className="mt-1 text-xs">{formatClp(selectedFeaturedPlan.price)} · Transbank sandbox</p>
+												<p className="mt-1 text-xs">El cobro comenzará únicamente después de que la publicación esté activa.</p>
+												<Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setFeaturedSelected(false)}>
+													Quitar publicidad
 												</Button>
 											</div>
 										) : (
-											<Button type="button" className="w-full" onClick={openFeaturedPayment} disabled={featuredProcessing}>
-												<CreditCard className="h-4 w-4" aria-hidden="true" />
-												Comprar destacado · {formatClp(selectedFeaturedPlan.price)}
+											<Button type="button" className="w-full" onClick={() => setFeaturedSelected(true)}>
+												<Sparkles className="h-4 w-4" aria-hidden="true" />
+												Añadir publicidad · {formatClp(selectedFeaturedPlan.price)}
 											</Button>
 										)}
-										<p id="featured-payment-status" className="text-xs text-muted-foreground">El pago es una simulación: no se solicitarán datos de tarjeta ni se realizará un cobro real.</p>
+										<p id="featured-payment-status" className="text-xs text-muted-foreground">Al publicar el producto, serás redirigido a Transbank para completar el pago de prueba. Si se rechaza o cancela, el producto seguirá publicado sin destacar.</p>
 									</TabsContent>
 								</Tabs>
 
@@ -887,7 +843,7 @@ export default function SellProductPage() {
 							<div className="mt-5 space-y-3">
 								<div className="flex flex-wrap gap-2">
 									<span className="badge badge-soft">{isAuction ? "Subasta" : "Venta"}</span>
-									{featuredPurchase && <span className="badge badge-soft">Destacado</span>}
+									{featuredSelected && <span className="badge badge-soft">Publicidad seleccionada</span>}
 									{condition && <span className="badge bg-muted text-muted-foreground">{condition}</span>}
 								</div>
 								<h2 className="wrap-break-word text-xl font-bold text-foreground">{name.trim() || "Nombre del producto"}</h2>
@@ -935,67 +891,15 @@ export default function SellProductPage() {
 						</div>
 						<ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
 							<li>El producto aparece en la página principal durante el periodo contratado.</li>
-							<li>La promoción se activa al publicar el producto con el destacado pagado.</li>
-							<li>El pago es simulado: no se solicitarán datos de tarjeta ni se realizará un cobro real.</li>
+							<li>Primero se publica el producto; después se abre Transbank para completar el pago de prueba.</li>
+							<li>El destacado solo se activa cuando Transbank confirma el pago. Si se rechaza o cancela, el producto queda publicado sin promoción.</li>
+							<li>Se usa exclusivamente el ambiente de integración de Transbank; no se realizan cobros reales.</li>
 						</ul>
 						<p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
 							Valores referenciales: {featuredPlans.map((plan) => `${plan.days} ${plan.days === 1 ? "día" : "días"} ${formatClp(plan.price)}`).join(" · ")}.
 						</p>
 						<div className="flex justify-end">
 							<Dialog.Close render={<Button type="button" variant="outline">Cerrar</Button>} />
-						</div>
-					</Dialog.Popup>
-				</Dialog.Portal>
-			</Dialog.Root>
-			<Dialog.Root
-				open={showFeaturedPayment}
-				onOpenChange={(open) => {
-					if (!featuredProcessing) setShowFeaturedPayment(open);
-				}}
-			>
-				<Dialog.Portal>
-					<Dialog.Backdrop className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
-					<Dialog.Popup className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 space-y-4 rounded-lg border border-border bg-surface p-6 text-foreground shadow-xl">
-						<div className="flex items-start gap-3">
-							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700"><CreditCard className="h-5 w-5" aria-hidden="true" /></span>
-							<div className="space-y-1">
-								<Dialog.Title className="text-lg font-semibold">Pagar destacado</Dialog.Title>
-								<Dialog.Description className="text-sm text-muted-foreground">Pago simulado: no se solicitarán datos de tarjeta ni se realizará un cobro real.</Dialog.Description>
-							</div>
-						</div>
-						<div className="space-y-2 rounded-md border border-border bg-muted/40 p-3 text-sm">
-							<div className="flex justify-between gap-3">
-								<span className="text-muted-foreground">Producto</span>
-								<span className="truncate font-medium text-foreground">{name.trim() || "Nuevo producto"}</span>
-							</div>
-							<div className="flex justify-between gap-3">
-								<span className="text-muted-foreground">Duración</span>
-								<span className="font-medium text-foreground">{selectedFeaturedPlan.days} {selectedFeaturedPlan.days === 1 ? "día" : "días"}</span>
-							</div>
-							<div className="flex justify-between gap-3 border-t border-border pt-2">
-								<span className="font-semibold text-foreground">Total</span>
-								<span className="font-extrabold text-foreground">{formatClp(selectedFeaturedPlan.price)}</span>
-							</div>
-						</div>
-						<fieldset className="space-y-2">
-							<legend className="text-sm font-medium text-foreground">Medio de pago</legend>
-							<div className="grid gap-2 sm:grid-cols-2">
-								<label className="flex cursor-pointer items-center gap-3 rounded-md border border-border p-3 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/70">
-									<input type="radio" name="featured-payment" value="webpay" checked={featuredPaymentMethod === "webpay"} onChange={() => setFeaturedPaymentMethod("webpay")} className="accent-brand-600" />
-									<span><span className="block font-semibold text-foreground">Webpay Plus</span><span className="text-xs text-muted-foreground">Transbank · Simulado</span></span>
-								</label>
-								<label className="flex cursor-pointer items-center gap-3 rounded-md border border-border p-3 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/70">
-									<input type="radio" name="featured-payment" value="mercadopago" checked={featuredPaymentMethod === "mercadopago"} onChange={() => setFeaturedPaymentMethod("mercadopago")} className="accent-brand-600" />
-									<span><span className="block font-semibold text-foreground">Mercado Pago</span><span className="text-xs text-muted-foreground">Simulado</span></span>
-								</label>
-							</div>
-						</fieldset>
-						{featuredPaymentError && <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">{featuredPaymentError}</p>}
-						<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-							<Button type="button" variant="outline" onClick={() => setShowFeaturedPayment(false)} disabled={featuredProcessing}>Cancelar</Button>
-							<Button type="button" onClick={() => void handleFeaturedPayment()} disabled={featuredProcessing}>
-								{featuredProcessing ? "Procesando pago..." : `Pagar ${formatClp(selectedFeaturedPlan.price)} (Simulación)`}
-							</Button>
 						</div>
 					</Dialog.Popup>
 				</Dialog.Portal>

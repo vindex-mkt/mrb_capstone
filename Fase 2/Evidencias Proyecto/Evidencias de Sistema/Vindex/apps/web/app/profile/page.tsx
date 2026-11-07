@@ -23,6 +23,7 @@ import { CHILE_LOCATIONS } from "@/lib/chile-locations";
 import SellerStores from "@/components/profile/SellerStores";
 import BuyerPurchases from "@/components/profile/BuyerPurchases";
 import SellerPickupOrders from "@/components/profile/SellerPickupOrders";
+import ProductAdvertisingControl from "@/components/profile/ProductAdvertisingControl";
 
 type SellerProduct = {
   id: number;
@@ -34,6 +35,8 @@ type SellerProduct = {
   images: string[] | null;
   discount_price: number | null;
   offer_ends_at: string | null;
+  is_featured: boolean | null;
+  featured_until: string | null;
   sale_type: string | null;
   starting_price: number | null;
   current_bid: number | null;
@@ -148,7 +151,7 @@ export default function ProfilePage() {
       const [productsResult, categoriesResult] = await Promise.all([
         supabase
           .from("products")
-          .select("id, name, description, category_id, price, stock, images, discount_price, offer_ends_at, sale_type, starting_price, current_bid, bid_increment, auction_ends_at, created_at")
+          .select("id, name, description, category_id, price, stock, images, discount_price, offer_ends_at, is_featured, featured_until, sale_type, starting_price, current_bid, bid_increment, auction_ends_at, created_at")
           .eq("seller_id", user.id)
           .eq("status", true)
           .order("created_at", { ascending: false }),
@@ -675,6 +678,11 @@ export default function ProfilePage() {
                                 )}
                               </div>
                               {product.description && <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{product.description}</p>}
+                              <ProductAdvertisingControl
+                                productId={product.id}
+                                isFeatured={product.is_featured ?? false}
+                                featuredUntil={product.featured_until}
+                              />
                             </div>
                           </div>
 

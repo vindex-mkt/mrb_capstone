@@ -30,6 +30,18 @@ Aplicar `supabase/migrations/20261105200000_webpay_plus_mall.sql` en Supabase an
 
 La interfaz impide agregar un tercer comercio lógico y muestra el mensaje de límite. El servidor repite esa validación usando los datos actuales de Supabase, por lo que cambiar el contenido del navegador no la evita. Al quitar todos los productos de un comercio, la validación del carrito se recalcula y permite incorporar otro.
 
+## Publicidad de productos
+
+La publicidad usa Webpay Plus estándar del ambiente de integración, con el código de comercio de prueba `WEBPAY_PLUS` del SDK oficial (`597055555532`), porque el cobro corresponde a Vindex y no a una tienda vendedora. No se usa un código productivo ni se envían detalles Mall.
+
+- Al crear una publicación, se inserta primero como producto no destacado. Solo después de que Supabase confirma que está publicada se inicia la transacción Webpay. Si la inserción falla, no se crea ni se cobra una transacción de publicidad.
+- El pago se calcula en servidor a partir de un plan permitido (1, 3, 7 o 14 días); se ignora cualquier monto enviado por el navegador. El estado destacado solo se activa tras `Transaction.commit` con `response_code === 0`, `status === "AUTHORIZED"` y monto/orden coincidentes.
+- Si el usuario cancela o el pago es rechazado, el producto permanece publicado y sin destacar. Ante resultado ambiguo o error de comunicación, el pago queda bloqueado para evitar un segundo cobro hasta revisar la operación.
+- En el perfil, junto a la administración de la oferta del producto, se puede iniciar publicidad para una publicación activa o extender una publicidad vigente. La extensión comienza al terminar el período vigente, o inmediatamente si ya venció.
+- La migración `supabase/migrations/20261107150000_webpay_advertising.sql` crea la bitácora privada de pagos, las RPC de creación/confirmación y la protección para que el cliente no altere directamente `is_featured` ni `featured_until`. También impide retirar una publicación mientras su pago está pendiente.
+
+Aplicar esta migración al mismo proyecto Supabase en el que se aplicó Webpay Plus Mall, y reiniciar el servidor web después de actualizar el código. No requiere una clave adicional de Transbank: usa la API key y las variables sandbox documentadas arriba.
+
 ## Verificación local
 
 Ejecutar pruebas del límite de comercios y de validación individual de subtransacciones:
@@ -58,3 +70,5 @@ Las pruebas de integración manual deben usar exclusivamente las tarjetas y cred
 | Monto cambiado desde el navegador | El monto enviado a Transbank sigue siendo el calculado desde Supabase. |
 | Confirmación repetida | La operación no se confirma una segunda vez; se devuelve su estado guardado. |
 | Código, orden o monto de respuesta alterado/incompleto | El pago queda `payment_review`, nunca `paid`, y requiere conciliación manual. |
+
+Para publicidad, probar además: error al insertar el producto (no se inicia pago), publicación activa con plan seleccionado (abre Webpay después de insertar), rechazo/cancelación (producto publicado y sin destacar), autorización (destacado activado solo en servidor), producto de otro vendedor o no publicado (rechazo), respuesta con monto/orden incorrectos (revisión) y confirmación repetida (sin segundo `commit`).

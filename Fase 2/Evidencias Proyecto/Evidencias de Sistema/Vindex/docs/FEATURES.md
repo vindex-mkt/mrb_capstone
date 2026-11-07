@@ -27,7 +27,8 @@ Status: 🟡 En desarrollo
 - [x] Mensajería entre compradores y vendedores para productos de compra directa
 - [x] Carrito sincronizado y persistido para productos de compra directa
 - [x] Checkout Webpay Plus Mall en sandbox con máximo dos comercios vendedores por compra
-- [x] Destacar publicaciones desde el formulario de venta con pago simulado en un modal
+- [x] Solicitar publicidad al publicar y activar el destacado solo tras autorización de Webpay sandbox
+- [x] Comprar o extender publicidad para publicaciones activas desde el perfil del vendedor
 - [x] Historial de compras del comprador y calificación de productos comprados
 - [ ] Eliminar producto
 
@@ -65,7 +66,8 @@ Status: 🟡 Integración sandbox disponible; requiere configurar y aplicar la m
 - [x] Confirmación individual de subtransacciones y estados para pagos aprobados, parciales y rechazados
 - [x] Límite de dos comercios vendedores distintos en frontend y servidor
 - [x] Bloqueo del uso de `process_mock_checkout` por clientes
-- [x] Pago simulado de destacados desde el formulario de venta
+- [x] Pagos de publicidad con Webpay Plus de integración, sin cobros reales
+- [x] Publicación conservada sin destacar si el pago de publicidad se rechaza o cancela
 - [x] Consulta de saldo disponible y congelado de la billetera en web
 - [x] Accesos a billetera y operaciones desde el navbar de escritorio y móvil
 - [x] Simulación de recarga con selección de Webpay Plus o Mercado Pago
