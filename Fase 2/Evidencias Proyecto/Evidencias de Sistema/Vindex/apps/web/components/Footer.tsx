@@ -138,7 +138,7 @@ export default function Footer() {
       {/* Barra inferior */}
       <div className="border-t border-white/10">
         <div className="container-site flex flex-col items-center justify-between gap-3 py-6 text-sm text-white/70 sm:flex-row">
-          <p>© {new Date().getFullYear()} Vindex · Hecho en Chile</p>
+          <p>© {new Date().getFullYear()} Vindex</p>
           <div className="flex flex-wrap justify-center gap-6">
             <Link
               href="/privacidad"

@@ -85,10 +85,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               </div>
               
               <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
+                {/* 
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
                   <IconShieldCheck className="h-5 w-5 text-brand-700" />
                   <span>Pago seguro con custodia y validación OTP.</span>
                 </div>
+                */}
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
                   <IconTruck className="h-5 w-5 text-brand-700" />
                   <span>{product.shipping_available ? "Envío disponible" : "Retiro en tienda"}</span>

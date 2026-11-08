@@ -30,10 +30,23 @@ type ProductCategory = { id: string; name: string };
 type OwnedStore = { id: number; name: string };
 type StoreCategory = { id: number; name: string };
 
-const numberInputClassName = "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
-
 const formatClp = (value: number) =>
 	new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(value);
+
+const keepDigits = (value: string) => value.replace(/\D/g, "");
+
+const parseClpInput = (value: string): number | null => {
+	const normalized = value.trim();
+	if (!/^(?:\d+|\d{1,3}(?:\.\d{3})+)$/.test(normalized)) return null;
+
+	const parsed = Number(normalized.replaceAll(".", ""));
+	return Number.isSafeInteger(parsed) ? parsed : null;
+};
+
+const formatClpInput = (value: string) => {
+	const parsed = parseClpInput(value);
+	return parsed === null ? value : new Intl.NumberFormat("es-CL").format(parsed);
+};
 
 const SelectedImageList = memo(function SelectedImageList({
 	images,
@@ -201,7 +214,7 @@ const createSlugSuffix = () => {
 
 export default function SellProductPage() {
 	const router = useRouter();
-	const { showToast } = useToast();
+	const { showToast, showCenteredSuccess } = useToast();
 	const [supabase] = useState(createClient);
 	const [authorized, setAuthorized] = useState(false);
 	const [name, setName] = useState("");
@@ -241,23 +254,23 @@ export default function SellProductPage() {
 	const [saving, setSaving] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 	const slug = name.trim() && slugSuffix ? `${toSlug(name)}-${slugSuffix}` : "";
-	const activePrice = isAuction ? startingPrice : price;
-	const formattedPrice = activePrice
-		? new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Number(activePrice))
-		: "Precio por definir";
+	const parsedPrice = parseClpInput(price);
+	const parsedStartingPrice = parseClpInput(startingPrice);
+	const parsedBidIncrement = parseClpInput(bidIncrement);
+	const parsedDiscountPrice = discountPrice.trim() ? parseClpInput(discountPrice) : null;
+	const activePrice = isAuction ? parsedStartingPrice : parsedPrice;
+	const formattedPrice = activePrice !== null ? formatClp(activePrice) : "Precio por definir";
 	const invalidPrice = !isAuction && (
-		price.trim() === "" || !Number.isFinite(Number(price)) || Number(price) < 0
+		price.trim() === "" || parsedPrice === null || parsedPrice < 0
 	);
-	const parsedStartingPrice = Number(startingPrice);
-	const parsedBidIncrement = Number(bidIncrement);
-	const maximumBidIncrement = Number.isSafeInteger(parsedStartingPrice) && parsedStartingPrice > 0
+	const maximumBidIncrement = parsedStartingPrice !== null && parsedStartingPrice > 0
 		? Math.floor(parsedStartingPrice * 0.5)
 		: null;
 	const invalidAuctionTerms = isAuction && (
 		startingPrice.trim() === "" ||
-		!Number.isSafeInteger(parsedStartingPrice) ||
+		parsedStartingPrice === null ||
 		parsedStartingPrice <= 0 ||
-		!Number.isSafeInteger(parsedBidIncrement) ||
+		parsedBidIncrement === null ||
 		parsedBidIncrement <= 0 ||
 		maximumBidIncrement === null ||
 		parsedBidIncrement > maximumBidIncrement ||
@@ -267,7 +280,7 @@ export default function SellProductPage() {
 		!Number.isSafeInteger(Number(stock)) ||
 		Number(stock) < (isAuction ? 1 : 0);
 	const invalidDiscountPrice = !isAuction && discountPrice.trim() !== "" && (
-		!Number.isFinite(Number(discountPrice)) || Number(discountPrice) >= Number(price)
+		parsedDiscountPrice === null || parsedPrice === null || parsedDiscountPrice >= parsedPrice
 	);
 	const invalidOfferDuration = !isAuction && discountPrice.trim() !== "" && (
 		offerDurationHours === "custom"
@@ -278,6 +291,10 @@ export default function SellProductPage() {
 		? Number(customOfferDurationHours)
 		: Number(offerDurationHours);
 	const selectedFeaturedPlan = featuredPlans.find((plan) => String(plan.days) === featuredDurationDays) ?? featuredPlans[2];
+
+	useEffect(() => {
+		window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+	}, []);
 
 	useEffect(() => {
 		let isCurrent = true;
@@ -407,7 +424,7 @@ export default function SellProductPage() {
 
 		if (invalidAuctionTerms) {
 			setErrorMessage(
-				maximumBidIncrement !== null && parsedBidIncrement > maximumBidIncrement
+				maximumBidIncrement !== null && parsedBidIncrement !== null && parsedBidIncrement > maximumBidIncrement
 					? `El incremento mínimo no puede superar ${new Intl.NumberFormat("es-CL").format(maximumBidIncrement)} CLP (50% del precio inicial).`
 					: "Ingresa un precio inicial y un incremento positivos en pesos enteros, y una duración válida para la subasta.",
 			);
@@ -444,7 +461,7 @@ export default function SellProductPage() {
 
 			const productSlug = slug || `${toSlug(name)}-${createSlugSuffix()}`;
 			const now = new Date();
-			const parsedDiscountPrice = !isAuction && discountPrice.trim() ? Number(discountPrice) : null;
+			const productDiscountPrice = !isAuction && discountPrice.trim() ? parseClpInput(discountPrice) : null;
 			const { data: product, error: productError } = await supabase.from("products").insert({
 				seller_id: user.id,
 				store_id: storeId ? Number(storeId) : null,
@@ -453,9 +470,9 @@ export default function SellProductPage() {
 				name: name.trim(),
 				slug: productSlug,
 				description: description.trim() || null,
-				price: isAuction ? null : Number(price),
-				discount_price: parsedDiscountPrice,
-				offer_ends_at: parsedDiscountPrice !== null
+				price: isAuction ? null : parseClpInput(price),
+				discount_price: productDiscountPrice,
+				offer_ends_at: productDiscountPrice !== null
 					? new Date(now.getTime() + parsedOfferDurationHours * 60 * 60 * 1000).toISOString()
 					: null,
 				is_featured: false,
@@ -466,9 +483,9 @@ export default function SellProductPage() {
 				images: [],
 				sale_type: isAuction ? "auction" : "direct",
 				is_auction: isAuction,
-				starting_price: isAuction ? Number(startingPrice) : null,
+				starting_price: isAuction ? parseClpInput(startingPrice) : null,
 				current_bid: null,
-				bid_increment: isAuction ? Number(bidIncrement) : null,
+				bid_increment: isAuction ? parseClpInput(bidIncrement) : null,
 				auction_ends_at: isAuction
 					? new Date(now.getTime() + Number(auctionDurationHours) * 60 * 60 * 1000).toISOString()
 					: null,
@@ -521,9 +538,9 @@ export default function SellProductPage() {
 			setIsAuction(false);
 			setShippingAvailable(true);
 			setIsPublished(true);
-			showToast(imageErrors.length > 0
+			showCenteredSuccess(imageErrors.length > 0
 				? "El producto se publicó, pero algunas imágenes no pudieron procesarse."
-				: "El producto se publicó correctamente.", "success");
+				: "El producto se publicó correctamente.");
 
 			if (promoteAfterPublish) {
 				try {
@@ -605,17 +622,17 @@ export default function SellProductPage() {
 									{isAuction ? (
 										<div className="space-y-2">
 											<Label htmlFor="startingPrice">Precio inicial de la subasta (CLP)</Label>
-											<Input id="startingPrice" className={numberInputClassName} type="number" min="1" step="1" value={startingPrice} onChange={(event) => setStartingPrice(event.target.value)} required />
+											<Input id="startingPrice" type="text" inputMode="numeric" pattern="[0-9.]*" value={startingPrice} onChange={(event) => setStartingPrice(keepDigits(event.target.value))} onBlur={() => setStartingPrice(formatClpInput(startingPrice))} required />
 										</div>
 									) : (
 										<div className="space-y-2">
 											<Label htmlFor="price">Precio (CLP)</Label>
-											<Input id="price" className={numberInputClassName} type="number" min="0" step="1" value={price} onChange={(event) => setPrice(event.target.value)} required />
+											<Input id="price" type="text" inputMode="numeric" pattern="[0-9.]*" value={price} onChange={(event) => setPrice(keepDigits(event.target.value))} onBlur={() => setPrice(formatClpInput(price))} required />
 										</div>
 									)}
 									<div className="space-y-2">
 										<Label htmlFor="stock">Stock</Label>
-										<Input id="stock" className={numberInputClassName} type="number" min={isAuction ? "1" : "0"} step="1" value={stock} onChange={(event) => setStock(event.target.value)} required />
+										<Input id="stock" type="text" inputMode="numeric" pattern="[0-9]*" value={stock} onChange={(event) => setStock(keepDigits(event.target.value))} required />
 									</div>
 								</div>
 
@@ -630,7 +647,7 @@ export default function SellProductPage() {
 										<div className="grid gap-4 sm:grid-cols-2">
 											<div className="space-y-2">
 												<Label htmlFor="bidIncrement">Incremento mínimo (CLP)</Label>
-												<Input id="bidIncrement" className={numberInputClassName} type="number" min="1" max={maximumBidIncrement ?? undefined} step="1" value={bidIncrement} onChange={(event) => setBidIncrement(event.target.value)} required />
+												<Input id="bidIncrement" type="text" inputMode="numeric" pattern="[0-9.]*" value={bidIncrement} onChange={(event) => setBidIncrement(keepDigits(event.target.value))} onBlur={() => setBidIncrement(formatClpInput(bidIncrement))} required />
 												<p className="text-xs text-muted-foreground">
 													El incremento no puede superar el 50% del precio inicial
 													{maximumBidIncrement === null ? "." : ` (${new Intl.NumberFormat("es-CL").format(maximumBidIncrement)} CLP).`}
@@ -660,13 +677,13 @@ export default function SellProductPage() {
 											<Label htmlFor="discountPrice">Precio de oferta (opcional)</Label>
 											<Input
 												id="discountPrice"
-												className={numberInputClassName}
-												type="number"
-												min="0"
-												step="any"
+												type="text"
+												inputMode="numeric"
+												pattern="[0-9.]*"
 												value={discountPrice}
 												aria-invalid={invalidDiscountPrice}
-												onChange={(event) => setDiscountPrice(event.target.value)}
+												onChange={(event) => setDiscountPrice(keepDigits(event.target.value))}
+												onBlur={() => setDiscountPrice(formatClpInput(discountPrice))}
 											/>
 											{invalidDiscountPrice ? (
 												<p role="alert" className="text-sm text-red-700">Debe ser menor que {formattedPrice}.</p>
@@ -685,7 +702,7 @@ export default function SellProductPage() {
 											{offerDurationHours === "custom" && (
 												<div className="space-y-2">
 													<Label htmlFor="customOfferDuration">Duración personalizada (horas)</Label>
-													<Input id="customOfferDuration" className={numberInputClassName} type="number" min="1" step="1" value={customOfferDurationHours} onChange={(event) => setCustomOfferDurationHours(event.target.value)} required />
+													<Input id="customOfferDuration" type="text" inputMode="numeric" pattern="[0-9]*" value={customOfferDurationHours} onChange={(event) => setCustomOfferDurationHours(keepDigits(event.target.value))} required />
 												</div>
 											)}
 										</div>
@@ -854,13 +871,13 @@ export default function SellProductPage() {
 											<p className="text-xs text-muted-foreground">Precio inicial</p>
 											<p className="text-2xl font-extrabold text-foreground">{formattedPrice}</p>
 											<p className="mt-1 text-sm text-muted-foreground">
-												Incremento: {new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Number(bidIncrement) || 0)}
+												Incremento: {formatClp(parsedBidIncrement ?? 0)}
 											</p>
 										</div>
 									) : discountPrice && !invalidDiscountPrice ? (
 										<>
 											<p className="text-2xl font-extrabold text-foreground">
-												{new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(Number(discountPrice))}
+												{formatClp(parsedDiscountPrice ?? 0)}
 											</p>
 											<p className="text-sm text-muted-foreground line-through">{formattedPrice}</p>
 										</>
