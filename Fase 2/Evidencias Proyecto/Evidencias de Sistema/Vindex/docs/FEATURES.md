@@ -6,10 +6,12 @@ Status: 🟡 En desarrollo
 
 - [x] Registro
 - [x] Login con correo y contraseña
+- [x] Recuperación de contraseña mediante enlace de Supabase Auth
 - [x] Cargar y guardar datos del perfil en metadatos del usuario de Supabase Auth
 - [x] Logout
-- [ ] Recuperación de contraseña
 - [ ] KYC
+
+El flujo de recuperación y la configuración de URLs permitidas están documentados en [AUTHENTICATION.md](./AUTHENTICATION.md).
 
 ---
 
