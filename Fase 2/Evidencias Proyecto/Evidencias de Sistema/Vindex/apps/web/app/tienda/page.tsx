@@ -13,17 +13,21 @@ import { ShoppingCart } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatProductPrice } from "@/lib/formatters";
 import { useCartStore } from "@/lib/store/useCartStore";
+import { useToast } from "@/components/ToastProvider";
+import { MAX_CART_MERCHANTS_MESSAGE } from "@/lib/checkout/merchant";
 
 type CatalogProduct = {
     id: number;
     name: string | null;
     slug: string | null;
+    description: string | null;
     price: number | null;
     discount_price: number | null;
     offer_ends_at: string | null;
     images: string[] | null;
     stock: number | null;
     seller_id: string;
+    store_id: number | null;
     condition: string | null;
     category_id: string | null;
     created_at: string;
@@ -33,6 +37,8 @@ type ProductCategory = { id: string; name: string };
 
 const conditions = ["Nuevo", "Usado", "Reacondicionado"];
 const fallbackImage = "https://picsum.photos/seed/vindex-catalog/640/640";
+const normalizeSearchText = (value: string) =>
+    value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es-CL");
 const getCurrentPrice = (product: CatalogProduct) =>
     product.discount_price !== null &&
     product.offer_ends_at !== null &&
@@ -45,6 +51,7 @@ function ShopCatalog() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const requestedCategoryId = searchParams.get("categoryId") ?? "";
+    const requestedSearch = searchParams.get("search") ?? "";
     const [products, setProducts] = useState<CatalogProduct[]>([]);
     const [categories, setCategories] = useState<ProductCategory[]>([]);
     const [search, setSearch] = useState("");
@@ -58,10 +65,46 @@ function ShopCatalog() {
     const [categoryErrorMessage, setCategoryErrorMessage] = useState("");
     const addItem = useCartStore((state) => state.addItem);
     const hasCartHydrated = useCartStore((state) => state.hasHydrated);
+    const { showToast } = useToast();
+    const [addingProductId, setAddingProductId] = useState<number | null>(null);
+
+    const handleAddToCart = async (product: CatalogProduct) => {
+        if (addingProductId !== null) return;
+        setAddingProductId(product.id);
+        try {
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            if (authError) throw authError;
+            if (user?.id === product.seller_id) {
+                showToast("No puedes agregar tus propios productos al carrito.", "error");
+                return;
+            }
+            if (!addItem({
+                id: product.id,
+                name: product.name ?? "Producto sin nombre",
+                price: getCurrentPrice(product) ?? 0,
+                image: product.images?.[0] || fallbackImage,
+                quantity: 1,
+                stock: Math.floor(product.stock ?? 0),
+                seller_id: product.seller_id,
+                store_id: product.store_id,
+            })) {
+                showToast(MAX_CART_MERCHANTS_MESSAGE, "error");
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Error desconocido";
+            showToast(`No se pudo verificar tu sesión: ${message}`, "error");
+        } finally {
+            setAddingProductId(null);
+        }
+    };
 
     useEffect(() => {
         setCategoryId(requestedCategoryId);
     }, [requestedCategoryId]);
+
+    useEffect(() => {
+        setSearch(requestedSearch);
+    }, [requestedSearch]);
 
     useEffect(() => {
         let isCurrent = true;
@@ -70,7 +113,7 @@ function ShopCatalog() {
             const [productResult, categoryResult] = await Promise.all([
                 supabase
                     .from("products")
-                    .select("id, name, slug, price, discount_price, offer_ends_at, images, stock, seller_id, condition, category_id, created_at")
+                    .select("id, name, slug, description, price, discount_price, offer_ends_at, images, stock, seller_id, store_id, condition, category_id, created_at")
                     .eq("status", true)
                     .in("sale_type", ["direct", "fixed_price"])
                     .gt("stock", 0)
@@ -99,12 +142,13 @@ function ShopCatalog() {
     }, [supabase]);
 
     const filteredProducts = useMemo(() => {
-        const normalizedSearch = search.trim().toLocaleLowerCase("es-CL");
+        const searchTerms = normalizeSearchText(search).trim().split(/\s+/).filter(Boolean);
         return products
             .filter((product) => {
                 const price = getCurrentPrice(product) ?? 0;
+                const searchableText = normalizeSearchText(`${product.name ?? ""} ${product.description ?? ""}`);
                 return (
-                    (!normalizedSearch || (product.name ?? "").toLocaleLowerCase("es-CL").includes(normalizedSearch)) &&
+                    searchTerms.every((term) => searchableText.includes(term)) &&
                     (!minimumPrice || price >= Number(minimumPrice)) &&
                     (!maximumPrice || price <= Number(maximumPrice)) &&
                     (!condition || product.condition === condition) &&
@@ -213,20 +257,16 @@ function ShopCatalog() {
                                             <Button
                                                 type="button"
                                                 variant="outline"
-                                                disabled={!hasCartHydrated || !product.stock || product.stock < 1}
-                                                onClick={() => addItem({
-                                                    id: product.id,
-                                                    name: product.name ?? "Producto sin nombre",
-                                                    price: getCurrentPrice(product) ?? 0,
-                                                    image: product.images?.[0] || fallbackImage,
-                                                    quantity: 1,
-                                                    stock: Math.floor(product.stock ?? 0),
-                                                    seller_id: product.seller_id,
-                                                })}
+                                                disabled={!hasCartHydrated || !product.stock || product.stock < 1 || addingProductId !== null}
+                                                onClick={() => void handleAddToCart(product)}
                                                 className="mx-3 mb-3 h-9 rounded-lg sm:mx-4 sm:mb-4"
                                             >
                                                 <ShoppingCart aria-hidden="true" />
-                                                {hasCartHydrated ? "Agregar al carrito" : "Preparando carrito..."}
+                                                {!hasCartHydrated
+                                                    ? "Preparando carrito..."
+                                                    : addingProductId === product.id
+                                                        ? "Verificando vendedor..."
+                                                        : "Agregar al carrito"}
                                             </Button>
                                             </div>
                                         </Card>

@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
+import { CHILE_LOCATIONS } from "@/lib/chile-locations";
 import { formatProductPrice } from "@/lib/formatters";
 import { useCartStore } from "@/lib/store/useCartStore";
 import { getMerchantKey, MAX_CART_MERCHANTS_MESSAGE } from "@/lib/checkout/merchant";
@@ -31,6 +33,12 @@ const emptyAddress: Address = {
 
 const isCompleteAddress = (address: Address) =>
   Object.values(address).every((value) => value.trim().length > 0);
+
+const isValidLocation = (address: Address) => {
+  const region = CHILE_LOCATIONS.find((location) => location.region === address.region);
+  const city = region?.cities.find((location) => location.name === address.city);
+  return city?.communes.includes(address.commune) ?? false;
+};
 
 const getCheckoutErrorMessage = (error: unknown) => {
   if (error instanceof Error) return error.message;
@@ -104,7 +112,12 @@ export default function CheckoutForm() {
   const shippingCost = shipping === "standard" ? 3990 : 0;
   const total = useMemo(() => subtotal + shippingCost, [shippingCost, subtotal]);
   const selectedAddress = addressChoice === "saved" && profileAddress ? profileAddress : address;
-  const addressIsValid = shipping === "pickup" || isCompleteAddress(selectedAddress);
+  const selectedRegion = CHILE_LOCATIONS.find((location) => location.region === address.region);
+  const availableCities = selectedRegion?.cities ?? [];
+  const availableCommunes = availableCities.find((city) => city.name === address.city)?.communes ?? [];
+  const addressIsValid = shipping === "pickup" || (
+    isCompleteAddress(selectedAddress) && isValidLocation(selectedAddress)
+  );
   const merchantKeys = items.map(getMerchantKey);
   const exceedsMerchantLimit =
     merchantKeys.some((key) => key === null) || new Set(merchantKeys).size > 2;
@@ -131,7 +144,7 @@ export default function CheckoutForm() {
 
     const shippingAddress = shipping === "pickup"
       ? "Acordar con el vendedor"
-      : `${selectedAddress.street.trim()} ${selectedAddress.street_number.trim()}, ${selectedAddress.commune.trim()}, ${selectedAddress.city.trim()}`;
+      : `${selectedAddress.street.trim()} ${selectedAddress.street_number.trim()}, ${selectedAddress.commune.trim()}, ${selectedAddress.city.trim()}, ${selectedAddress.region.trim()}`;
 
     setSubmitting(true);
     try {
@@ -270,15 +283,62 @@ export default function CheckoutForm() {
                   <div className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="checkout-region">Región</Label>
-                      <Input id="checkout-region" autoComplete="address-level1" value={address.region} onChange={(event) => updateAddress("region", event.target.value)} required={shipping === "standard"} />
+                      <Select
+                        id="checkout-region"
+                        autoComplete="address-level1"
+                        value={address.region}
+                        onChange={(event) => {
+                          setAddress((currentAddress) => ({
+                            ...currentAddress,
+                            region: event.target.value,
+                            city: "",
+                            commune: "",
+                          }));
+                        }}
+                        required={shipping === "standard"}
+                      >
+                        <option value="">Selecciona una región</option>
+                        {CHILE_LOCATIONS.map((location) => (
+                          <option key={location.region} value={location.region}>{location.region}</option>
+                        ))}
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="checkout-city">Ciudad</Label>
-                      <Input id="checkout-city" autoComplete="address-level2" value={address.city} onChange={(event) => updateAddress("city", event.target.value)} required={shipping === "standard"} />
+                      <Select
+                        id="checkout-city"
+                        autoComplete="address-level2"
+                        value={address.city}
+                        onChange={(event) => {
+                          setAddress((currentAddress) => ({
+                            ...currentAddress,
+                            city: event.target.value,
+                            commune: "",
+                          }));
+                        }}
+                        disabled={!address.region}
+                        required={shipping === "standard"}
+                      >
+                        <option value="">Selecciona una ciudad</option>
+                        {availableCities.map((city) => (
+                          <option key={city.name} value={city.name}>{city.name}</option>
+                        ))}
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="checkout-commune">Comuna</Label>
-                      <Input id="checkout-commune" value={address.commune} onChange={(event) => updateAddress("commune", event.target.value)} required={shipping === "standard"} />
+                      <Select
+                        id="checkout-commune"
+                        value={address.commune}
+                        onChange={(event) => updateAddress("commune", event.target.value)}
+                        disabled={!address.city}
+                        required={shipping === "standard"}
+                      >
+                        <option value="">Selecciona una comuna</option>
+                        {availableCommunes.map((commune) => (
+                          <option key={commune} value={commune}>{commune}</option>
+                        ))}
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="checkout-street">Calle</Label>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
@@ -77,8 +78,14 @@ export default function Navbar() {
     router.refresh();
   };
 
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = search.trim();
+    router.push(query ? `/tienda?search=${encodeURIComponent(query)}` : "/tienda");
+  };
+
   const searchField = () => (
-    <div className="relative w-full">
+    <form onSubmit={handleSearch} className="relative w-full">
       <IconSearch className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <input
         type="text"
@@ -89,12 +96,12 @@ export default function Navbar() {
         className="search-input"
       />
       <button
-        type="button"
+        type="submit"
         className="absolute right-1.5 top-1/2 flex h-8 -translate-y-1/2 items-center rounded-full bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
       >
         Buscar
       </button>
-    </div>
+    </form>
   );
 
   return (

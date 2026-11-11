@@ -253,6 +253,7 @@ export default function SellProductPage() {
 	const [isPublished, setIsPublished] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
+	const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 	const slug = name.trim() && slugSuffix ? `${toSlug(name)}-${slugSuffix}` : "";
 	const parsedPrice = parseClpInput(price);
 	const parsedStartingPrice = parseClpInput(startingPrice);
@@ -415,7 +416,18 @@ export default function SellProductPage() {
 
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
+		setHasAttemptedSubmit(true);
 		setErrorMessage(null);
+
+		if (isPublished && selectedImages.length === 0) {
+			document.getElementById("images")?.focus();
+			return;
+		}
+
+		if (!description.trim()) {
+			document.getElementById("description")?.focus();
+			return;
+		}
 
 		if (invalidPrice) {
 			setErrorMessage("Ingresa un precio válido para la publicación.");
@@ -479,7 +491,7 @@ export default function SellProductPage() {
 				featured_until: null,
 				stock: Number(stock),
 				condition,
-				status: isPublished,
+				status: false,
 				images: [],
 				sale_type: isAuction ? "auction" : "direct",
 				is_auction: isAuction,
@@ -504,12 +516,29 @@ export default function SellProductPage() {
 				(message) => imageErrors.push(message),
 			);
 
-			if (imageUrls.length > 0) {
-				const { error: imagesUpdateError } = await supabase
+			if (isPublished && imageUrls.length === 0) {
+				const { error: deleteError } = await supabase
 					.from("products")
-					.update({ images: imageUrls })
+					.delete()
 					.eq("id", product.id);
-				if (imagesUpdateError) imageErrors.push(`No se pudieron guardar las URLs en el producto: ${imagesUpdateError.message}`);
+				const uploadMessage = imageErrors.length > 0 ? ` ${imageErrors.join(" ")}` : "";
+				const cleanupMessage = deleteError
+					? ` No se pudo limpiar el borrador creado: ${deleteError.message}`
+					: "";
+				throw new Error(`No se publicó el producto porque ninguna imagen pudo cargarse.${uploadMessage}${cleanupMessage}`);
+			}
+
+			const { error: imagesUpdateError } = await supabase
+				.from("products")
+				.update({ images: imageUrls, status: isPublished })
+				.eq("id", product.id);
+			if (imagesUpdateError) {
+				const { error: deleteError } = await supabase
+					.from("products")
+					.delete()
+					.eq("id", product.id);
+				const cleanupMessage = deleteError ? ` No se pudo limpiar el borrador: ${deleteError.message}` : "";
+				throw new Error(`No se pudo guardar la imagen y activar la publicación: ${imagesUpdateError.message}.${cleanupMessage}`);
 			}
 
 			if (imageErrors.length > 0) setErrorMessage(imageErrors.join(" "));
@@ -615,7 +644,18 @@ export default function SellProductPage() {
                                 */}
 								<div className="space-y-2">
 									<Label htmlFor="description">Descripción</Label>
-									<Textarea id="description" value={description} onChange={(event) => setDescription(event.target.value)} rows={4} />
+									<Textarea
+										id="description"
+										value={description}
+										onChange={(event) => setDescription(event.target.value)}
+										onInvalid={() => setHasAttemptedSubmit(true)}
+										aria-invalid={hasAttemptedSubmit && !description.trim()}
+										rows={4}
+										required
+									/>
+									{hasAttemptedSubmit && !description.trim() && (
+										<p role="alert" className="text-sm text-red-700">La descripción es obligatoria.</p>
+									)}
 								</div>
 
 								<div className="grid gap-4 sm:grid-cols-2">
@@ -787,7 +827,7 @@ export default function SellProductPage() {
 								</div>
 
 								<div className="space-y-2">
-									<Label>Imágenes del producto</Label>
+									<Label>Imágenes del producto{isPublished ? " *" : ""}</Label>
 									<div
 										className={`rounded-lg border border-dashed p-5 text-center transition ${isDraggingImages ? "border-brand-500 bg-brand-50" : "border-border bg-muted/40"}`}
 										onDragOver={(event) => {
@@ -811,6 +851,8 @@ export default function SellProductPage() {
 											accept="image/*"
 											multiple
 											className="sr-only"
+											aria-invalid={hasAttemptedSubmit && isPublished && selectedImages.length === 0}
+											aria-describedby={hasAttemptedSubmit && isPublished && selectedImages.length === 0 ? "images-error" : undefined}
 											onChange={(event) => {
 												if (event.target.files) addImages(event.target.files);
 												event.target.value = "";
@@ -823,6 +865,11 @@ export default function SellProductPage() {
 									</div>
 									{selectedImages.length > 0 && (
 										<SelectedImageList images={selectedImages} onRemove={removeImage} />
+									)}
+									{hasAttemptedSubmit && isPublished && selectedImages.length === 0 && (
+										<p id="images-error" role="alert" className="text-sm text-red-700">
+											Tienes que agregar al menos una imagen para publicar un producto.
+										</p>
 									)}
 								</div>
 

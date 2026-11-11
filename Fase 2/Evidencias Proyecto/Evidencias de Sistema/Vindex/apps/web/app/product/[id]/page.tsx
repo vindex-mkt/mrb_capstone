@@ -38,12 +38,13 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           <span className="text-foreground">{product.name ?? "Producto"}</span>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)] lg:items-start">
-          <div className="lg:sticky lg:top-24">
+        <div className="rounded-2xl border border-border bg-surface p-4 sm:p-6 lg:p-8">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)] lg:items-start">
+          <div>
             <ProductGallery images={galleryImages} alt={product.name ?? "Producto"} />
           </div>
 
-          <div className="lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-2">
+          <div>
             <div className="space-y-6">
               <div>
                 <p className="eyebrow">Producto</p>
@@ -127,6 +128,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 storeId={product.store_id}
               />
             </div>
+          </div>
           </div>
         </div>
 

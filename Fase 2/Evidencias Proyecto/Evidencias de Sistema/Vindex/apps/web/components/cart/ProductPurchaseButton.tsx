@@ -33,27 +33,32 @@ export default function ProductPurchaseButton({ product, currentPrice, action = 
   const handlePurchase = async () => {
     if (!canAdd || currentPrice === null || buying) return;
 
-    const cartItem = {
-      id: product.id,
-      name: product.name ?? "Producto sin nombre",
-      price: currentPrice,
-      image: getProductImage(product),
-      quantity: 1,
-      stock,
-      seller_id: product.seller_id,
-      store_id: product.store_id,
-    };
-    if (!addItem(cartItem)) {
-      showToast(MAX_CART_MERCHANTS_MESSAGE, "error");
-      return;
-    }
-    setWasAdded(true);
-    if (action === "add") return;
-
     setBuying(true);
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
+      if (user?.id === product.seller_id) {
+        showToast("No puedes agregar tus propios productos al carrito.", "error");
+        return;
+      }
+
+      const cartItem = {
+        id: product.id,
+        name: product.name ?? "Producto sin nombre",
+        price: currentPrice,
+        image: getProductImage(product),
+        quantity: 1,
+        stock,
+        seller_id: product.seller_id,
+        store_id: product.store_id,
+      };
+      if (!addItem(cartItem)) {
+        showToast(MAX_CART_MERCHANTS_MESSAGE, "error");
+        return;
+      }
+      setWasAdded(true);
+      if (action === "add") return;
+
       if (!user) {
         router.push("/checkout");
         return;
@@ -114,7 +119,7 @@ export default function ProductPurchaseButton({ product, currentPrice, action = 
       {!hasHydrated
         ? "Preparando carrito..."
         : buying
-          ? "Preparando compra..."
+          ? "Verificando vendedor..."
         : canAdd
           ? action === "buy" ? "Comprar ahora" : wasAdded ? "Agregado al carrito" : "Agregar al carrito"
           : "No disponible para compra"}

@@ -20,6 +20,8 @@ El flujo de recuperación y la configuración de URLs permitidas están document
 Status: 🟡 En desarrollo
 
 - [x] Crear producto
+- [x] Exigir al menos una imagen al publicar un producto
+- [x] Buscar productos por coincidencias parciales en el nombre o la descripción
 - [x] Editar publicaciones propias desde el perfil de vendedor
 - [x] Asignar o corregir la categoría de una publicación al editarla
 - [x] Filtrar productos por categoría desde la tienda y el menú de navegación
@@ -29,6 +31,7 @@ Status: 🟡 En desarrollo
 - [x] Mensajería entre compradores y vendedores para productos de compra directa
 - [x] Carrito sincronizado y persistido para productos de compra directa
 - [x] Checkout Webpay Plus Mall en sandbox con máximo dos comercios vendedores por compra
+- [x] Impedir que un vendedor compre sus propios productos
 - [x] Solicitar publicidad al publicar y activar el destacado solo tras autorización de Webpay sandbox
 - [x] Comprar o extender publicidad para publicaciones activas desde el perfil del vendedor
 - [x] Historial de compras del comprador y calificación de productos comprados

@@ -20,7 +20,7 @@ Aplicar `supabase/migrations/20261105200000_webpay_plus_mall.sql` en Supabase an
 
 ## Flujo y consistencia
 
-1. `POST /api/payments/webpay/initiate` autentica al usuario y llama a `create_webpay_checkout`. La RPC lee carrito, precios, descuentos, stock y la relación producto/tienda/vendedor en Supabase; rechaza productos no disponibles, precios CLP fraccionarios, tienda sin dueño coincidente y más de dos comercios.
+1. `POST /api/payments/webpay/initiate` autentica al usuario y comprueba desde Supabase que ninguno de los productos del carrito pertenezca al comprador; si encuentra uno, rechaza el pago con HTTP 409. Luego llama a `create_webpay_checkout`. La RPC lee carrito, precios, descuentos, stock y la relación producto/tienda/vendedor en Supabase; rechaza productos no disponibles, precios CLP fraccionarios, tienda sin dueño coincidente y más de dos comercios.
 2. El comercio lógico es `store:<store_id>` cuando `products.store_id` existe; si no, `seller:<seller_id>`. La ordenación por identificador lógico hace estable la asignación de códigos hijo durante la compra. Cada comercio recibe un código distinto. El envío estándar (CLP 3.990) se reparte entre los comercios; cualquier residuo se asigna al primero. En retiro el envío es CLP 0.
 3. La RPC reserva stock, crea una orden `pending_payment` y persiste importes y órdenes hijas aleatorias antes de llamar a `MallTransaction.create`. Si la creación falla antes de exponer el token al comprador, la reserva se libera. Los montos enviados al SDK vienen de la base de datos, nunca del navegador.
 4. El comprador se redirige mediante un formulario POST a la URL de integración de Transbank. La ruta de retorno guarda temporalmente el token en una cookie `HttpOnly`; la página de resultado inicia `MallTransaction.commit` una sola vez. Un reintento no vuelve a llamar a Transbank si la operación está procesándose o ya terminó.
@@ -66,6 +66,7 @@ Las pruebas de integración manual deben usar exclusivamente las tarjetas y cred
 | Token inválido | No se llama a `commit` ni se altera otra orden. |
 | Token vencido | El pago no se considera aprobado; se muestra resultado no confirmado y se requiere revisar Transbank antes de reintentar. |
 | Usuario no autenticado | No inicia ni confirma pagos; la orden de otro comprador no se revela. |
+| Comprador intenta pagar un producto propio | La ruta de inicio rechaza la compra con HTTP 409 antes de crear la orden o iniciar Webpay. |
 | Producto sin stock o inactivo | La creación se rechaza antes de redirigir y no se crea un cobro. |
 | Monto cambiado desde el navegador | El monto enviado a Transbank sigue siendo el calculado desde Supabase. |
 | Confirmación repetida | La operación no se confirma una segunda vez; se devuelve su estado guardado. |

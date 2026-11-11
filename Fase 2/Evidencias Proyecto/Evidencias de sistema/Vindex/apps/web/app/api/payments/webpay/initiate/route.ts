@@ -132,6 +132,44 @@ export async function POST(request: NextRequest) {
     console.error("Falta configurar la clave de servidor de Supabase para Webpay.");
     return NextResponse.json({ message: "El servidor de pagos no está configurado todavía." }, { status: 503 });
   }
+
+  const { data: cart, error: cartError } = await adminClient
+    .from("carts")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (cartError) {
+    console.error("No se pudo verificar el carrito antes de iniciar Webpay:", cartError.message);
+    return NextResponse.json({ message: "No pudimos verificar tu carrito. Inténtalo nuevamente." }, { status: 500 });
+  }
+
+  if (cart) {
+    const { data: cartItems, error: cartItemsError } = await adminClient
+      .from("cart_items")
+      .select("product_id")
+      .eq("cart_id", cart.id);
+    if (cartItemsError) {
+      console.error("No se pudieron verificar los productos del carrito antes de iniciar Webpay:", cartItemsError.message);
+      return NextResponse.json({ message: "No pudimos verificar tu carrito. Inténtalo nuevamente." }, { status: 500 });
+    }
+
+    const productIds = (cartItems ?? []).map((item) => item.product_id);
+    if (productIds.length > 0) {
+      const { data: products, error: productsError } = await adminClient
+        .from("products")
+        .select("seller_id")
+        .in("id", productIds);
+      if (productsError) {
+        console.error("No se pudieron verificar los vendedores del carrito antes de iniciar Webpay:", productsError.message);
+        return NextResponse.json({ message: "No pudimos verificar tu carrito. Inténtalo nuevamente." }, { status: 500 });
+      }
+
+      if ((products ?? []).some((product) => product.seller_id === user.id)) {
+        return NextResponse.json({ message: "No puedes comprar tus propios productos." }, { status: 409 });
+      }
+    }
+  }
+
   const { data: checkoutData, error: createError } = await adminClient.rpc("create_webpay_checkout", {
     p_user_id: user.id,
     p_shipping_address: body.shippingAddress,
