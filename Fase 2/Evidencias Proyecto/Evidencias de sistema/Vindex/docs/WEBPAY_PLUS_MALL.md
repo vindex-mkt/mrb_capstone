@@ -30,6 +30,17 @@ Aplicar `supabase/migrations/20261105200000_webpay_plus_mall.sql` en Supabase an
 
 La interfaz impide agregar un tercer comercio lógico y muestra el mensaje de límite. El servidor repite esa validación usando los datos actuales de Supabase, por lo que cambiar el contenido del navegador no la evita. Al quitar todos los productos de un comercio, la validación del carrito se recalcula y permite incorporar otro.
 
+## Pagos pendientes: conciliación, reintento y cancelación
+
+En **Perfil → Comprador → Mis compras** se muestra la sección **Pagos pendientes** para las órdenes Webpay que sigan en `created`, `initiated`, `processing`, `payment_review` o `communication_error`. La sección actualiza el estado cada minuto mientras está abierta; el servidor intenta resolver intentos vencidos al listar los pagos o antes de iniciar otro checkout:
+
+- La espera máxima es de cinco minutos desde la creación. Un intento `created` sin token se cierra con la RPC existente de fallo una vez vencida esa ventana.
+- Para un intento con token se consulta `MallTransaction.status`. Si Transbank confirma autorización, se recupera el retorno y se ejecuta el flujo idempotente de `commit`; no se crea un cobro nuevo.
+- Si pasaron cinco minutos y todos los comercios siguen en `INITIALIZED`, el servidor valida orden, comercio, buy order y montos, cancela el intento local y libera su reserva; el checkout puede reintentarse con el carrito conservado.
+- Los rechazos terminales verificados se registran como `rejected`. Si Transbank no responde o devuelve un estado desconocido/inconsistente, se conserva la reserva y se bloquea otro cobro: no es seguro cancelar a ciegas porque podría haber una autorización.
+
+Aplicar `supabase/migrations/20261113160000_resolve_failed_webpay_checkouts.sql` y `supabase/migrations/20261113162500_grant_service_role_select_webpay_payments.sql` antes de desplegar el frontend. La RPC de conciliación y las lecturas de órdenes/pagos se limitan a `service_role`; la RPC vuelve a comprobar toda la respuesta antes de liberar el bloqueo.
+
 ## Publicidad de productos
 
 La publicidad usa Webpay Plus estándar del ambiente de integración, con el código de comercio de prueba `WEBPAY_PLUS` del SDK oficial (`597055555532`), porque el cobro corresponde a Vindex y no a una tienda vendedora. No se usa un código productivo ni se envían detalles Mall.
@@ -73,3 +84,11 @@ Las pruebas de integración manual deben usar exclusivamente las tarjetas y cred
 | Código, orden o monto de respuesta alterado/incompleto | El pago queda `payment_review`, nunca `paid`, y requiere conciliación manual. |
 
 Para publicidad, probar además: error al insertar el producto (no se inicia pago), publicación activa con plan seleccionado (abre Webpay después de insertar), rechazo/cancelación (producto publicado y sin destacar), autorización (destacado activado solo en servidor), producto de otro vendedor o no publicado (rechazo), respuesta con monto/orden incorrectos (revisión) y confirmación repetida (sin segundo `commit`).
+
+## Entrega a coordinar y ledger de custodia (sandbox)
+
+Al seleccionar **Entrega a coordinar con el vendedor**, el checkout oculta y omite la dirección. Esta opción admite un solo vendedor por orden, validado en el cliente y mediante una restricción de base de datos para impedir que un OTP libere el saldo de más de una entrega. Una vez que el estado de pago sea `paid`, el servidor crea una conversación idempotente y el comprador se redirige al chat. Un trigger marca la respuesta del vendedor; hasta entonces, el OTP no se entrega al comprador ni se acepta para validar la operación. Al recibir el producto, el OTP válido libera el registro de custodia y acredita el saldo interno del vendedor. Comprador y vendedor ven sus montos en custodia en `/wallet`; la calificación sigue condicionada a la entrega completada.
+
+Desplegar `supabase/migrations/20261109170000_pickup_order_escrow.sql` sobre las funciones existentes `get_buyer_delivery_code` y `verify_delivery_otp`. La migración restringe las funciones base y entrega acceso mediante RPC coordinadas; aplicar la migración antes de publicar la versión web.
+
+Este flujo es únicamente una **simulación de ledger** con las credenciales de integración. Webpay Mall autoriza subtransacciones por comercio hijo y el código existente no retiene fondos reales en Vindex. Acreditar el saldo interno no inicia una transferencia real al vendedor. Para producción, el producto debe cambiar a un adquirente que liquide primero a Vindex y contar con un payout conciliado/reembolsable antes de anunciar custodia real.

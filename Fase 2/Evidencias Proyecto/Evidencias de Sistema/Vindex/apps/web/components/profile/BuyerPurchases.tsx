@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import PendingWebpayPayments from "@/components/profile/PendingWebpayPayments";
 import { createClient } from "@/lib/supabase/client";
 import { formatProductPrice } from "@/lib/formatters";
 import { useToast } from "@/components/ToastProvider";
@@ -17,6 +20,7 @@ type Order = {
   total: number;
   shipping_address: string;
   delivery_status: string;
+  shipping_method?: string;
 };
 
 type OrderItem = {
@@ -47,22 +51,41 @@ type DeliveryCodeResponse = {
   message?: string;
 };
 
+type OrderSellerChat = {
+  order_id: number;
+  seller_id: string;
+  conversation_id: number;
+  seller_replied_at: string | null;
+};
+
+type BuyerOrdersResponse = {
+  orders?: Order[];
+  chats?: OrderSellerChat[];
+  message?: string;
+};
+
 const isPickupOrder = (order: Order) =>
-  order.shipping_address.toLocaleLowerCase("es").includes("acordar con el vendedor")
+  order.shipping_method === "pickup"
+  || order.shipping_address.toLocaleLowerCase("es").includes("coordinar con el vendedor")
+  || order.shipping_address.toLocaleLowerCase("es").includes("acordar con el vendedor")
   || order.shipping_address.toLocaleLowerCase("es").startsWith("retiro en tienda");
 
 export default function BuyerPurchases() {
+  const router = useRouter();
   const [supabase] = useState(createClient);
   const { showToast } = useToast();
   const [items, setItems] = useState<PurchaseItem[]>([]);
   const [ratedProductIds, setRatedProductIds] = useState<Set<number>>(new Set());
   const [deliveryCodes, setDeliveryCodes] = useState<Record<number, string | null>>({});
+  const [sellerChats, setSellerChats] = useState<OrderSellerChat[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [ratingItem, setRatingItem] = useState<PurchaseItem | null>(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
+  const [startingCoordinationOrderId, setStartingCoordinationOrderId] = useState<number | null>(null);
+  const [refreshingCoordinationOrderId, setRefreshingCoordinationOrderId] = useState<number | null>(null);
 
   useEffect(() => {
     let current = true;
@@ -81,24 +104,28 @@ export default function BuyerPurchases() {
         return;
       }
 
-      const { data: orders, error: ordersError } = await supabase
-        .from("orders")
-        .select("id, status, created_at, total, shipping_address, delivery_status")
-        .eq("buyer_id", user.id)
-        .order("created_at", { ascending: false });
-      if (!current) return;
-      if (ordersError) {
-        setLoadError(`No se pudieron cargar tus compras: ${ordersError.message}`);
+      let loadedOrders: Order[];
+      try {
+        const response = await fetch("/api/orders/mine", { cache: "no-store" });
+        const result = await response.json() as BuyerOrdersResponse;
+        if (!response.ok || !Array.isArray(result.orders) || !Array.isArray(result.chats)) {
+          throw new Error(result.message ?? "No pudimos cargar tus compras.");
+        }
+        loadedOrders = result.orders;
+        setSellerChats(result.chats);
+      } catch (error) {
+        if (!current) return;
+        setLoadError(`No se pudieron cargar tus compras: ${error instanceof Error ? error.message : "Error desconocido"}`);
         setLoading(false);
         return;
       }
+      if (!current) return;
 
-      const loadedOrders = (orders ?? []) as Order[];
       const pickupOrders = loadedOrders.filter((order) =>
         isPickupOrder(order) && ["paid", "completed", "delivered"].includes(order.status.toLowerCase()),
       );
       const codeResults = await Promise.all(pickupOrders.map((order) => supabase.rpc(
-        "get_buyer_delivery_code",
+        "get_coordinated_buyer_delivery_code",
         { p_order_id: order.id },
       )));
       if (!current) return;
@@ -179,6 +206,62 @@ export default function BuyerPurchases() {
     setComment("");
   };
 
+  const startCoordinationChat = async (orderId: number) => {
+    setStartingCoordinationOrderId(orderId);
+    try {
+      const response = await fetch(`/api/orders/${orderId}/pickup-chat`, {
+        method: "POST",
+        cache: "no-store",
+      });
+      const result = await response.json() as { conversationId?: unknown; message?: unknown };
+      if (!response.ok || typeof result.conversationId !== "number") {
+        throw new Error(typeof result.message === "string" ? result.message : "No se pudo iniciar el chat.");
+      }
+      router.push(`/messages/${result.conversationId}`);
+    } catch (coordinationError) {
+      const message = coordinationError instanceof Error ? coordinationError.message : "Error desconocido";
+      showToast(`No se pudo iniciar la coordinación: ${message}`, "error");
+    } finally {
+      setStartingCoordinationOrderId(null);
+    }
+  };
+
+  const refreshCoordination = async (orderId: number) => {
+    setRefreshingCoordinationOrderId(orderId);
+    try {
+      const [codeResult, chatsResult] = await Promise.all([
+        supabase.rpc("get_coordinated_buyer_delivery_code", { p_order_id: orderId }),
+        supabase
+          .from("order_seller_chats")
+          .select("order_id, seller_id, conversation_id, seller_replied_at")
+          .eq("order_id", orderId),
+      ]);
+      if (codeResult.error) throw codeResult.error;
+      if (chatsResult.error) throw chatsResult.error;
+
+      const code = codeResult.data as DeliveryCodeResponse | null;
+      setDeliveryCodes((current) => ({
+        ...current,
+        [orderId]: code?.success && typeof code.delivery_code === "string" ? code.delivery_code : null,
+      }));
+      setSellerChats((current) => [
+        ...current.filter((chat) => chat.order_id !== orderId),
+        ...((chatsResult.data ?? []) as OrderSellerChat[]),
+      ]);
+      showToast(
+        code?.success
+          ? "El código OTP ya está disponible."
+          : code?.message ?? "La coordinación todavía está pendiente.",
+        code?.success ? "success" : "info",
+      );
+    } catch (refreshError) {
+      const message = refreshError instanceof Error ? refreshError.message : "Error desconocido";
+      showToast(`No se pudo actualizar la coordinación: ${message}`, "error");
+    } finally {
+      setRefreshingCoordinationOrderId(null);
+    }
+  };
+
   const submitRating = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!ratingItem?.product_id || ratedProductIds.has(ratingItem.product_id)) return;
@@ -224,10 +307,12 @@ export default function BuyerPurchases() {
           <p role="status" className="text-sm text-muted-foreground">Cargando tu historial de compras...</p>
         ) : loadError ? (
           <p role="alert" className="text-sm text-red-700">{loadError}</p>
-        ) : items.length === 0 ? (
-          <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Aún no tienes compras registradas.</p>
         ) : (
-          <ul className="divide-y divide-border">
+          <>
+            <PendingWebpayPayments />
+            {items.length === 0 ? (
+              <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Aún no tienes compras registradas.</p>
+            ) : <ul className="divide-y divide-border">
             {items.map((item, index) => {
               const pickupOrder = isPickupOrder(item.order);
               const deliveryCompleted = item.order.delivery_status === "completed";
@@ -238,6 +323,8 @@ export default function BuyerPurchases() {
               const hasRated = item.product_id !== null && ratedProductIds.has(item.product_id);
               const isFirstOrderItem = items.findIndex((purchase) => purchase.order.id === item.order.id) === index;
               const deliveryCode = deliveryCodes[item.order.id];
+              const orderChats = sellerChats.filter((chat) => chat.order_id === item.order.id);
+              const sellersHaveReplied = orderChats.length > 0 && orderChats.every((chat) => chat.seller_replied_at);
 
               return (
                 <li key={item.id} className="flex flex-col gap-4 py-5 first:pt-0 sm:flex-row sm:items-center">
@@ -253,23 +340,64 @@ export default function BuyerPurchases() {
                       {item.quantity} × {formatProductPrice(Number(item.unit_price))} · Estado: {pickupOrder
                         ? !paymentConfirmed
                           ? item.order.status === "partially_paid" ? "Pago parcialmente autorizado" : "Pago pendiente o rechazado"
-                          : deliveryCompleted ? "Entregado" : "Pendiente de retiro"
+                          : deliveryCompleted ? "Entregado" : "Pendiente de coordinación"
                         : item.order.status}
                     </p>
                     {pickupOrder && paymentConfirmed && isFirstOrderItem && (
                       <div className={`mt-4 rounded-xl border p-4 ${deliveryCompleted ? "border-emerald-200 bg-emerald-50" : "border-brand-200 bg-brand-50/70"}`}>
                         {deliveryCompleted ? (
-                          <p className="font-semibold text-emerald-800">Retiro presencial completado</p>
+                          <p className="font-semibold text-emerald-800">Entrega coordinada y confirmada</p>
                         ) : deliveryCode && /^\d{6}$/.test(deliveryCode) ? (
                           <>
-                            <p className="text-sm font-semibold text-foreground">Código de retiro seguro</p>
+                            <p className="text-sm font-semibold text-foreground">Código OTP de entrega</p>
                             <p className="mt-1 font-mono text-3xl font-extrabold tracking-[0.3em] text-brand-800" aria-label={`Código de retiro ${deliveryCode}`}>
                               {deliveryCode}
                             </p>
-                            <p className="mt-2 text-sm text-muted-foreground">Dicta este código al vendedor únicamente cuando tengas el producto en tus manos.</p>
+                            <p className="mt-2 text-sm text-muted-foreground">Compártelo con el vendedor únicamente cuando tengas el producto en tus manos. La validación liberará los fondos retenidos.</p>
+                          </>
+                        ) : orderChats.length > 0 ? (
+                          <>
+                            <p className="text-sm font-semibold text-foreground">
+                              {sellersHaveReplied
+                                ? "La entrega está coordinada. El código OTP no está disponible."
+                                : "El vendedor debe confirmar la coordinación antes de habilitar el código OTP."}
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-3">
+                              {orderChats.map((chat) => (
+                                <Link
+                                  key={chat.conversation_id}
+                                  href={`/messages/${chat.conversation_id}`}
+                                  className="text-sm font-semibold text-brand-800 underline underline-offset-2"
+                                >
+                                  {chat.seller_replied_at ? "Ver chat de entrega" : "Coordinar con el vendedor"}
+                                </Link>
+                              ))}
+                            </div>
+                            {!deliveryCode && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="mt-3"
+                                disabled={refreshingCoordinationOrderId === item.order.id}
+                                onClick={() => void refreshCoordination(item.order.id)}
+                              >
+                                {refreshingCoordinationOrderId === item.order.id ? "Revisando..." : "Actualizar coordinación y OTP"}
+                              </Button>
+                            )}
                           </>
                         ) : (
-                          <p className="text-sm text-muted-foreground">El código de retiro no está disponible. Contacta a soporte.</p>
+                          <>
+                            <p className="text-sm text-muted-foreground">La entrega requiere coordinarse por el chat de la orden antes de habilitar el OTP.</p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="mt-3"
+                              disabled={startingCoordinationOrderId === item.order.id}
+                              onClick={() => void startCoordinationChat(item.order.id)}
+                            >
+                              {startingCoordinationOrderId === item.order.id ? "Abriendo chat..." : "Iniciar coordinación"}
+                            </Button>
+                          </>
                         )}
                       </div>
                     )}
@@ -285,7 +413,8 @@ export default function BuyerPurchases() {
                 </li>
               );
             })}
-          </ul>
+            </ul>}
+          </>
         )}
       </CardContent>
 

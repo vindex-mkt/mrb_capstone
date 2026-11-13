@@ -166,15 +166,17 @@ export default function CheckoutSuccess({ orderId }: { orderId: string | null })
                 <div className="space-y-2 border-t border-border pt-4 text-sm">
                   <div className="flex justify-between gap-3">
                     <span className="text-muted-foreground">
-                      {order.shipping_address.toLocaleLowerCase("es").includes("acordar con el vendedor")
-                        ? "Retiro presencial acordado con el vendedor"
+                      {order.shipping_address.toLocaleLowerCase("es").includes("coordinar con el vendedor")
+                        || order.shipping_address.toLocaleLowerCase("es").includes("acordar con el vendedor")
+                        ? "Entrega a coordinar con el vendedor"
                         : `Envío a ${order.shipping_address}`}
                     </span>
                     <span className="font-medium text-foreground">{formatProductPrice(Number(order.shipping_cost))}</span>
                   </div>
-                  {order.shipping_address.toLocaleLowerCase("es").includes("acordar con el vendedor") && (
+                  {(order.shipping_address.toLocaleLowerCase("es").includes("coordinar con el vendedor")
+                    || order.shipping_address.toLocaleLowerCase("es").includes("acordar con el vendedor")) && (
                     <p className="rounded-lg bg-brand-50 p-3 text-sm text-brand-900">
-                      Tu código OTP estará disponible en <Link href="/profile" className="font-semibold underline underline-offset-2">Mis Compras</Link>. Compártelo con el vendedor solo cuando tengas el producto en tus manos.
+                      Después de que el vendedor confirme la coordinación por chat, el código OTP estará disponible en <Link href="/profile" className="font-semibold underline underline-offset-2">Mis Compras</Link>. Compártelo solo cuando recibas el producto; la validación libera los fondos retenidos.
                     </p>
                   )}
                   <div className="flex justify-between gap-3 border-t border-border pt-3 text-base"><span className="font-semibold text-foreground">Total pagado</span><span className="font-extrabold text-foreground">{formatProductPrice(Number(order.total))}</span></div>

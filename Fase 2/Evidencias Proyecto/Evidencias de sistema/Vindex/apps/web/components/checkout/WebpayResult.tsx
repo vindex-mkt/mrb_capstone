@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, CircleX, LoaderCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCartStore } from "@/lib/store/useCartStore";
@@ -60,10 +61,13 @@ const mapPaymentStatus = (status: string | undefined): ResultState => {
 export default function WebpayResult({
   orderId: initialOrderId,
   returnState,
+  resumePayment,
 }: {
   orderId: string | null;
   returnState: string | null;
+  resumePayment: boolean;
 }) {
+  const router = useRouter();
   const [state, setState] = useState<ResultState>("loading");
   const [orderId, setOrderId] = useState<number | null>(
     initialOrderId && /^\d+$/.test(initialOrderId) ? Number(initialOrderId) : null,
@@ -97,6 +101,39 @@ export default function WebpayResult({
           setOrderId(id);
           setState(nextState);
           window.history.replaceState(null, "", `/checkout/result?order_id=${id}`);
+          if (nextState === "approved") {
+            try {
+              const coordinationResponse = await fetch(`/api/orders/${id}/pickup-chat`, {
+                method: "POST",
+                cache: "no-store",
+              });
+              const coordination = await coordinationResponse.json() as {
+                conversationId?: unknown;
+                redirect?: unknown;
+                message?: unknown;
+              };
+              if (!coordinationResponse.ok) {
+                throw new Error(
+                  typeof coordination.message === "string"
+                    ? coordination.message
+                    : "No se pudo iniciar el chat de coordinación.",
+                );
+              }
+              if (
+                typeof coordination.conversationId === "number"
+                && Number.isSafeInteger(coordination.conversationId)
+              ) {
+                router.push(`/messages/${coordination.conversationId}`);
+                return;
+              }
+            } catch (coordinationError) {
+              setMessage(
+                coordinationError instanceof Error
+                  ? `El pago se aprobó, pero no pudimos abrir el chat: ${coordinationError.message}`
+                  : "El pago se aprobó, pero no pudimos abrir el chat.",
+              );
+            }
+          }
           return;
         }
         if (attempt < 5) await wait(1200);
@@ -110,6 +147,24 @@ export default function WebpayResult({
     const run = async () => {
       if (initialOrderId && /^\d+$/.test(initialOrderId)) {
         try {
+          if (resumePayment) {
+            const commitResponse = await fetch("/api/payments/webpay/commit", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: "{}",
+              cache: "no-store",
+            });
+            const commitData = await commitResponse.json() as { state?: string; orderId?: number };
+            if (
+              !commitResponse.ok
+              || typeof commitData.orderId !== "number"
+              || !Number.isSafeInteger(commitData.orderId)
+            ) {
+              throw new Error("No pudimos recuperar la confirmación del pago anterior.");
+            }
+            await loadStatus(commitData.orderId);
+            return;
+          }
           await loadStatus(Number(initialOrderId));
         } catch (statusError) {
           setMessage(statusError instanceof Error ? statusError.message : "No pudimos consultar el pago.");
@@ -163,7 +218,7 @@ export default function WebpayResult({
     };
 
     void run();
-  }, [initialOrderId, orderId, returnState, state]);
+  }, [initialOrderId, message, orderId, returnState, resumePayment, router, state]);
 
   const copy = {
     loading: {

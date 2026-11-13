@@ -121,6 +121,8 @@ export default function CheckoutForm() {
   const merchantKeys = items.map(getMerchantKey);
   const exceedsMerchantLimit =
     merchantKeys.some((key) => key === null) || new Set(merchantKeys).size > 2;
+  const pickupHasMultipleSellers =
+    shipping === "pickup" && new Set(items.map((item) => item.seller_id)).size > 1;
 
   const updateAddress = (field: keyof Address, value: string) => {
     setAddress((currentAddress) => ({ ...currentAddress, [field]: value }));
@@ -135,6 +137,10 @@ export default function CheckoutForm() {
     }
     if (exceedsMerchantLimit) {
       setErrorMessage(MAX_CART_MERCHANTS_MESSAGE);
+      return;
+    }
+    if (pickupHasMultipleSellers) {
+      setErrorMessage("La entrega a coordinar requiere que todos los productos sean del mismo vendedor. Divide la compra o elige envío estándar.");
       return;
     }
     if (!addressIsValid) {
@@ -224,7 +230,7 @@ export default function CheckoutForm() {
           <div>
             <p className="eyebrow">Vindex</p>
             <h1 className="section-title mt-1">Finalizar compra</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Confirma tu dirección, envío y medio de pago.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Confirma cómo recibirás tu compra y el medio de pago.</p>
           </div>
           <Link href="/cart" className="link-more">Volver al carrito</Link>
         </div>
@@ -239,119 +245,79 @@ export default function CheckoutForm() {
             {MAX_CART_MERCHANTS_MESSAGE}
           </p>
         )}
+        {pickupHasMultipleSellers && (
+          <p role="alert" className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            Para coordinar una sola entrega segura, el carrito debe contener productos de un solo vendedor. Divide la compra o elige envío estándar.
+          </p>
+        )}
 
         <form onSubmit={(event) => void handleCheckout(event)} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start">
           <div className="space-y-6">
-            <Card className="border-border bg-surface">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg"><MapPin className="size-5 text-brand-700" />1. Dirección de envío</CardTitle>
-                <CardDescription>Elige tu dirección guardada o ingresa una distinta para este pedido.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {profileAddress && isCompleteAddress(profileAddress) && (
+            {shipping === "standard" && (
+              <Card className="border-border bg-surface">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg"><MapPin className="size-5 text-brand-700" />1. Dirección de envío</CardTitle>
+                  <CardDescription>Elige tu dirección guardada o ingresa una distinta para este pedido.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {profileAddress && isCompleteAddress(profileAddress) && (
+                    <label className="flex cursor-pointer gap-3 rounded-xl border border-border p-4 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/70">
+                      <input
+                        type="radio"
+                        name="address-choice"
+                        value="saved"
+                        checked={addressChoice === "saved"}
+                        onChange={() => setAddressChoice("saved")}
+                        className="mt-1 accent-brand-600"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-medium text-foreground">Usar dirección guardada</span>
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          {profileAddress.street} {profileAddress.street_number}, {profileAddress.commune}, {profileAddress.city}, {profileAddress.region}
+                        </span>
+                      </span>
+                    </label>
+                  )}
+
                   <label className="flex cursor-pointer gap-3 rounded-xl border border-border p-4 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/70">
                     <input
                       type="radio"
                       name="address-choice"
-                      value="saved"
-                      checked={addressChoice === "saved"}
-                      onChange={() => setAddressChoice("saved")}
+                      value="new"
+                      checked={addressChoice === "new"}
+                      onChange={() => setAddressChoice("new")}
                       className="mt-1 accent-brand-600"
                     />
-                    <span className="min-w-0">
-                      <span className="block font-medium text-foreground">Usar dirección guardada</span>
-                      <span className="mt-1 block text-sm text-muted-foreground">
-                        {profileAddress.street} {profileAddress.street_number}, {profileAddress.commune}, {profileAddress.city}, {profileAddress.region}
-                      </span>
-                    </span>
+                    <span className="font-medium text-foreground">Ingresar otra dirección</span>
                   </label>
-                )}
 
-                <label className="flex cursor-pointer gap-3 rounded-xl border border-border p-4 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/70">
-                  <input
-                    type="radio"
-                    name="address-choice"
-                    value="new"
-                    checked={addressChoice === "new"}
-                    onChange={() => setAddressChoice("new")}
-                    className="mt-1 accent-brand-600"
-                  />
-                  <span className="font-medium text-foreground">Ingresar otra dirección</span>
-                </label>
-
-                {addressChoice === "new" && (
-                  <div className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="checkout-region">Región</Label>
-                      <Select
-                        id="checkout-region"
-                        autoComplete="address-level1"
-                        value={address.region}
-                        onChange={(event) => {
-                          setAddress((currentAddress) => ({
-                            ...currentAddress,
-                            region: event.target.value,
-                            city: "",
-                            commune: "",
-                          }));
-                        }}
-                        required={shipping === "standard"}
-                      >
-                        <option value="">Selecciona una región</option>
-                        {CHILE_LOCATIONS.map((location) => (
-                          <option key={location.region} value={location.region}>{location.region}</option>
-                        ))}
-                      </Select>
+                  {addressChoice === "new" && (
+                    <div className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="checkout-region">Región</Label>
+                        <Input id="checkout-region" autoComplete="address-level1" value={address.region} onChange={(event) => updateAddress("region", event.target.value)} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="checkout-city">Ciudad</Label>
+                        <Input id="checkout-city" autoComplete="address-level2" value={address.city} onChange={(event) => updateAddress("city", event.target.value)} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="checkout-commune">Comuna</Label>
+                        <Input id="checkout-commune" value={address.commune} onChange={(event) => updateAddress("commune", event.target.value)} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="checkout-street">Calle</Label>
+                        <Input id="checkout-street" autoComplete="street-address" value={address.street} onChange={(event) => updateAddress("street", event.target.value)} required />
+                      </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label htmlFor="checkout-street-number">Número / departamento</Label>
+                        <Input id="checkout-street-number" autoComplete="address-line2" value={address.street_number} onChange={(event) => updateAddress("street_number", event.target.value)} required />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="checkout-city">Ciudad</Label>
-                      <Select
-                        id="checkout-city"
-                        autoComplete="address-level2"
-                        value={address.city}
-                        onChange={(event) => {
-                          setAddress((currentAddress) => ({
-                            ...currentAddress,
-                            city: event.target.value,
-                            commune: "",
-                          }));
-                        }}
-                        disabled={!address.region}
-                        required={shipping === "standard"}
-                      >
-                        <option value="">Selecciona una ciudad</option>
-                        {availableCities.map((city) => (
-                          <option key={city.name} value={city.name}>{city.name}</option>
-                        ))}
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="checkout-commune">Comuna</Label>
-                      <Select
-                        id="checkout-commune"
-                        value={address.commune}
-                        onChange={(event) => updateAddress("commune", event.target.value)}
-                        disabled={!address.city}
-                        required={shipping === "standard"}
-                      >
-                        <option value="">Selecciona una comuna</option>
-                        {availableCommunes.map((commune) => (
-                          <option key={commune} value={commune}>{commune}</option>
-                        ))}
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="checkout-street">Calle</Label>
-                      <Input id="checkout-street" autoComplete="street-address" value={address.street} onChange={(event) => updateAddress("street", event.target.value)} required={shipping === "standard"} />
-                    </div>
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="checkout-street-number">Número / departamento</Label>
-                      <Input id="checkout-street-number" autoComplete="address-line2" value={address.street_number} onChange={(event) => updateAddress("street_number", event.target.value)} required={shipping === "standard"} />
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="border-border bg-surface">
               <CardHeader>
@@ -371,7 +337,7 @@ export default function CheckoutForm() {
                   <input type="radio" name="shipping" checked={shipping === "pickup"} onChange={() => setShipping("pickup")} className="mt-1 accent-brand-600" />
                   <Store className="mt-0.5 size-5 shrink-0 text-brand-700" />
                   <span className="flex flex-1 flex-wrap justify-between gap-2">
-                    <span><span className="block font-medium text-foreground">Retiro presencial: acordar con el vendedor</span><span className="text-sm text-muted-foreground">Coordina la entrega directamente con quien vende</span></span>
+                    <span><span className="block font-medium text-foreground">Entrega a coordinar con el vendedor</span><span className="text-sm text-muted-foreground">Paga primero y luego coordina la entrega por el chat de la orden</span></span>
                     <span className="font-semibold text-foreground">{formatProductPrice(0)}</span>
                   </span>
                 </label>
@@ -419,7 +385,7 @@ export default function CheckoutForm() {
                   <div className="flex justify-between gap-3"><span className="text-muted-foreground">Envío</span><span className="font-medium text-foreground">{formatProductPrice(shippingCost)}</span></div>
                   <div className="flex justify-between gap-3 border-t border-border pt-3 text-base"><span className="font-semibold text-foreground">Total</span><span className="font-extrabold text-foreground">{formatProductPrice(total)}</span></div>
                 </div>
-                <Button type="submit" className="mt-5 h-11 w-full bg-brand-600 text-white hover:bg-brand-700" disabled={submitting || !addressIsValid || exceedsMerchantLimit}>
+                <Button type="submit" className="mt-5 h-11 w-full bg-brand-600 text-white hover:bg-brand-700" disabled={submitting || !addressIsValid || exceedsMerchantLimit || pickupHasMultipleSellers}>
                   {submitting ? "Conectando con Transbank..." : "Pagar con Webpay"}
                 </Button>
                 <p className="mt-3 text-center text-xs text-muted-foreground">Se usarán exclusivamente credenciales y tarjetas de prueba; no se realizarán cobros reales.</p>

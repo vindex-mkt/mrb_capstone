@@ -37,3 +37,9 @@ La aplicación web consulta `user_wallets.balance` y `user_wallets.locked_balanc
 La página explica el flujo de garantías y ofrece accesos a las secciones de ingreso y retiro. El ingreso presenta una simulación local de pago con Webpay Plus y Mercado Pago, siguiendo el patrón del checkout y del pago de destacados. La simulación no cobra ni acredita saldo; para habilitar recargas reales se requiere integrar una pasarela y una operación segura del servidor. Los retiros permanecen deshabilitados hasta implementar un flujo seguro de desembolso. El historial de transacciones tampoco se muestra porque el esquema documentado no incluye una tabla de movimientos.
 
 Antes de habilitar operaciones, hay que desplegar el esquema de [`vindex-wallet.md`](../supabase/migrations/vindex-wallet.md) y definir las operaciones transaccionales y controles de autorización del servidor. No realizar cambios de saldo desde el cliente.
+
+## Custodia de entregas a coordinar
+
+La migración `20261109170000_pickup_order_escrow.sql` agrega saldos de órdenes en custodia, visibles por comprador y vendedor en `/wallet`, sin mezclarlos con las garantías de subasta (`locked_balance`). El comprador solo recibe el OTP tras la respuesta del vendedor en el chat de la orden. La verificación del OTP marca la custodia como liberada y acredita el monto al saldo disponible interno del vendedor en la misma transacción.
+
+**Importante:** es una simulación de ledger para el ambiente de integración. El checkout actual usa Webpay Mall, cuyas subtransacciones se liquidan a comercios hijos; esta migración no captura ni retiene dinero real en Vindex ni implementa desembolsos. No habilitar producción con la promesa de custodia real hasta cambiar el modelo de adquirencia/liquidación y añadir un flujo real de payouts.

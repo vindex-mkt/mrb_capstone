@@ -67,7 +67,7 @@ export default function WalletPage() {
                 Mi billetera
               </h1>
               <p className="mt-2 max-w-xl text-sm leading-6 text-brand-100 sm:text-base">
-                Administra tus créditos y revisa las garantías reservadas para tus subastas.
+                Administra tus créditos y consulta las garantías y entregas en custodia.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -135,6 +135,23 @@ export default function WalletPage() {
                     <LockKeyhole className="h-6 w-6" aria-hidden="true" />
                   </span>
                 </div>
+              </article>
+              <article className="card border-amber-200 bg-amber-50/70 p-5 sm:p-7">
+                <p className="text-sm font-semibold text-muted-foreground">Compras en custodia</p>
+                <p className="mt-3 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+                  {loading ? "Cargando..." : error ? "No disponible" : balances ? formatCLP(balances.buyerEscrow) : "—"}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Se liberan al vendedor cuando validas el OTP al recibir.</p>
+              </article>
+              <article
+                className="card border-amber-200 bg-amber-50/70 p-5 sm:p-7"
+                title="Fondos retenidos por ventas"
+              >
+                <p className="text-sm font-semibold text-muted-foreground">Ventas retenidas</p>
+                <p className="mt-3 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+                  {loading ? "Cargando..." : error ? "No disponible" : balances ? formatCLP(balances.sellerEscrow) : "—"}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Se acreditan en tu saldo disponible al validar el OTP.</p>
               </article>
             </section>
 

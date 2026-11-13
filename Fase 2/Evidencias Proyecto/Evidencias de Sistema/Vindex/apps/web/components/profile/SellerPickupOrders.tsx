@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { CheckCircle2, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +38,7 @@ type Product = {
 type SellerOrder = {
   order: Order;
   items: (OrderItem & { product: Product | null })[];
+  conversationId: number | null;
 };
 
 type VerifyOtpResponse = {
@@ -46,7 +48,8 @@ type VerifyOtpResponse = {
 };
 
 const isPickupOrder = (order: Order) =>
-  order.shipping_address.toLocaleLowerCase("es").includes("acordar con el vendedor")
+  order.shipping_address.toLocaleLowerCase("es").includes("coordinar con el vendedor")
+  || order.shipping_address.toLocaleLowerCase("es").includes("acordar con el vendedor")
   || order.shipping_address.toLocaleLowerCase("es").startsWith("retiro en tienda");
 
 export default function SellerPickupOrders() {
@@ -116,6 +119,17 @@ export default function SellerPickupOrders() {
 
       const pickupOrderIds = new Set(pickupOrders.map((order) => order.id));
       const pickupItems = loadedItems.filter((item) => pickupOrderIds.has(item.order_id));
+      const { data: chats, error: chatsError } = await supabase
+        .from("order_seller_chats")
+        .select("order_id, conversation_id")
+        .in("order_id", [...pickupOrderIds])
+        .eq("seller_id", user.id);
+      if (!current) return;
+      if (chatsError) {
+        setLoadError(`No se pudieron cargar los chats de coordinación: ${chatsError.message}`);
+        setLoading(false);
+        return;
+      }
       const productIds = [...new Set(pickupItems.flatMap((item) => item.product_id === null ? [] : [item.product_id]))];
       const productsResult = productIds.length > 0
         ? await supabase.from("products").select("id, name, images").in("id", productIds)
@@ -130,6 +144,7 @@ export default function SellerPickupOrders() {
       const products = (productsResult.data ?? []) as Product[];
       setOrders(pickupOrders.map((order) => ({
         order,
+        conversationId: chats?.find((chat) => chat.order_id === order.id)?.conversation_id ?? null,
         items: pickupItems.filter((item) => item.order_id === order.id).map((item) => ({
           ...item,
           product: products.find((product) => product.id === item.product_id) ?? null,
@@ -158,7 +173,7 @@ export default function SellerPickupOrders() {
 
     setSubmittingOrderId(orderId);
     try {
-      const { data, error } = await supabase.rpc("verify_delivery_otp", {
+      const { data, error } = await supabase.rpc("verify_pickup_otp_and_release_escrow", {
         p_order_id: orderId,
         p_entered_code: codeInput,
       });
@@ -166,7 +181,7 @@ export default function SellerPickupOrders() {
 
       const result = data as VerifyOtpResponse | null;
       if (!result?.success) {
-        showToast(result?.message ?? "No se pudo validar el código de retiro.", "error");
+        showToast(result?.message ?? "No se pudo validar el código OTP.", "error");
         return;
       }
 
@@ -174,7 +189,7 @@ export default function SellerPickupOrders() {
         ? { ...entry, order: { ...entry.order, delivery_status: "completed" } }
         : entry));
       setCodes((current) => ({ ...current, [orderId]: "" }));
-      showToast(result.message ?? "Entrega confirmada con éxito.", "success");
+      showToast(result.message ?? "Entrega confirmada y fondos liberados al vendedor.", "success");
     } catch (verificationError) {
       const message = verificationError instanceof Error ? verificationError.message : "Error desconocido";
       showToast(`No se pudo validar la entrega: ${message}`, "error");
@@ -186,19 +201,19 @@ export default function SellerPickupOrders() {
   return (
     <Card className="border-border bg-surface">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg text-foreground"><KeyRound className="size-5 text-brand-700" />Mis Ventas · Retiros presenciales</CardTitle>
-        <CardDescription>Confirma la entrega ingresando el código OTP que te entrega el comprador en persona.</CardDescription>
+        <CardTitle className="flex items-center gap-2 text-lg text-foreground"><KeyRound className="size-5 text-brand-700" />Mis Ventas · Entregas a coordinar</CardTitle>
+        <CardDescription>Responde al comprador por el chat para acordar la entrega. Los fondos solo se liberan al validar su código OTP cuando reciba el producto.</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <p role="status" className="text-sm text-muted-foreground">Cargando retiros de tus ventas...</p>
+          <p role="status" className="text-sm text-muted-foreground">Cargando entregas de tus ventas...</p>
         ) : loadError ? (
           <p role="alert" className="text-sm text-red-700">{loadError}</p>
         ) : orders.length === 0 ? (
-          <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No tienes órdenes con retiro presencial.</p>
+          <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No tienes órdenes con entrega a coordinar.</p>
         ) : (
           <ul className="space-y-4">
-            {orders.map(({ order, items: orderItems }) => {
+            {orders.map(({ order, items: orderItems, conversationId }) => {
               const delivered = order.delivery_status === "completed";
               return (
                 <li key={order.id} className="rounded-xl border border-border p-4 sm:p-5">
@@ -210,7 +225,7 @@ export default function SellerPickupOrders() {
                       </p>
                     </div>
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${delivered ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>
-                      {delivered ? "Entregado" : "Pendiente de retiro"}
+                      {delivered ? "Entregado" : "Pendiente de coordinación"}
                     </span>
                   </div>
 
@@ -223,10 +238,19 @@ export default function SellerPickupOrders() {
                     ))}
                   </ul>
 
+                  {conversationId !== null && (
+                    <Link
+                      href={`/messages/${conversationId}`}
+                      className="mt-4 inline-flex min-h-10 items-center rounded-lg border border-brand-600 px-4 text-sm font-semibold text-brand-800 hover:bg-brand-50"
+                    >
+                      Coordinar entrega con el comprador
+                    </Link>
+                  )}
+
                   {delivered ? (
                     <p className="mt-4 flex items-center gap-2 text-sm font-medium text-emerald-800">
                       <CheckCircle2 className="size-4" aria-hidden="true" />
-                      Entrega validada. El comprador ya puede calificar el producto.
+                      Entrega validada y fondos liberados. El comprador ya puede calificar el producto.
                     </p>
                   ) : (
                     <form onSubmit={(event) => void verifyDelivery(event, order.id)} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">

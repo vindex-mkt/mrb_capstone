@@ -23,6 +23,34 @@ export type ValidatedMallDetail = {
   verification_error: boolean;
 };
 
+export type MallTransactionStatusClassification =
+  | "authorized"
+  | "rejected"
+  | "not_authorized"
+  | "unresolved";
+
+export const classifyMallTransactionStatus = (
+  details: readonly ValidatedMallDetail[],
+): MallTransactionStatusClassification => {
+  if (details.length === 0 || details.some((detail) => detail.verification_error)) {
+    return "unresolved";
+  }
+  if (details.some((detail) => detail.status === "AUTHORIZED" && detail.response_code === 0)) {
+    return "authorized";
+  }
+  if (details.every((detail) =>
+    ["FAILED", "REJECTED"].includes(detail.status ?? "")
+    && detail.response_code !== null
+    && detail.response_code !== 0
+  )) {
+    return "rejected";
+  }
+  if (details.every((detail) => detail.status === "INITIALIZED")) {
+    return "not_authorized";
+  }
+  return "unresolved";
+};
+
 const asString = (value: unknown) => typeof value === "string" ? value : null;
 const asInteger = (value: unknown) =>
   typeof value === "number" && Number.isSafeInteger(value) ? value : null;

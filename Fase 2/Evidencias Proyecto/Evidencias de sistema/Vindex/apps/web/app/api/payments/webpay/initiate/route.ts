@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { listBuyerPendingPayments, resolveBuyerPendingPayment } from "@/lib/checkout/pending-payments";
 import { createMallDetails, createMallTransaction, getPublicOrigin, getTestChildCommerceCodes, isRecord, isValidIntegrationRedirect } from "@/lib/checkout/webpay";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -16,6 +17,12 @@ const isSameOrigin = (request: NextRequest) => {
 };
 
 const checkoutError = (message: string) => {
+  if (message.includes("PICKUP_MULTIPLE_SELLERS")) {
+    return {
+      status: 409,
+      message: "La entrega a coordinar requiere una compra con productos de un solo vendedor. Divide la compra o elige envío estándar.",
+    };
+  }
   if (message.includes("CART_SELLER_LIMIT")) {
     return {
       status: 409,
@@ -27,7 +34,7 @@ const checkoutError = (message: string) => {
     return { status: 409, message: "Uno o más productos ya no están disponibles o no tienen stock suficiente." };
   }
   if (message.includes("PENDING_PAYMENT_EXISTS")) {
-    return { status: 409, message: "Ya tienes un pago pendiente de confirmación. Espera el resultado antes de iniciar otro." };
+    return { status: 409, message: "Ya existe un pago sin resolver. Ve a Perfil > Mis compras > Pagos pendientes para revisarlo antes de iniciar otro cobro." };
   }
   if (message.includes("INVALID_CLP_AMOUNT")) {
     return { status: 400, message: "Los precios deben estar expresados en pesos chilenos enteros para pagar con Webpay." };
@@ -102,6 +109,8 @@ export async function POST(request: NextRequest) {
     || typeof body.shippingAddress !== "string"
     || typeof body.shippingMethod !== "string"
     || !["standard", "pickup"].includes(body.shippingMethod)
+    || (body.shippingMethod === "standard"
+      && /coordinar con el vendedor|acordar con el vendedor|retiro en tienda/i.test(body.shippingAddress))
   ) {
     return NextResponse.json({ message: "Completa los datos de envío antes de pagar." }, { status: 400 });
   }
@@ -133,46 +142,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "El servidor de pagos no está configurado todavía." }, { status: 503 });
   }
 
-  const { data: cart, error: cartError } = await adminClient
-    .from("carts")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (cartError) {
-    console.error("No se pudo verificar el carrito antes de iniciar Webpay:", cartError.message);
-    return NextResponse.json({ message: "No pudimos verificar tu carrito. Inténtalo nuevamente." }, { status: 500 });
-  }
-
-  if (cart) {
-    const { data: cartItems, error: cartItemsError } = await adminClient
-      .from("cart_items")
-      .select("product_id")
-      .eq("cart_id", cart.id);
-    if (cartItemsError) {
-      console.error("No se pudieron verificar los productos del carrito antes de iniciar Webpay:", cartItemsError.message);
-      return NextResponse.json({ message: "No pudimos verificar tu carrito. Inténtalo nuevamente." }, { status: 500 });
-    }
-
-    const productIds = (cartItems ?? []).map((item) => item.product_id);
-    if (productIds.length > 0) {
-      const { data: products, error: productsError } = await adminClient
-        .from("products")
-        .select("seller_id")
-        .in("id", productIds);
-      if (productsError) {
-        console.error("No se pudieron verificar los vendedores del carrito antes de iniciar Webpay:", productsError.message);
-        return NextResponse.json({ message: "No pudimos verificar tu carrito. Inténtalo nuevamente." }, { status: 500 });
-      }
-
-      if ((products ?? []).some((product) => product.seller_id === user.id)) {
-        return NextResponse.json({ message: "No puedes comprar tus propios productos." }, { status: 409 });
+  try {
+    const pendingPayments = await listBuyerPendingPayments(adminClient, user.id);
+    for (const pendingPayment of pendingPayments) {
+      const resolution = await resolveBuyerPendingPayment(
+        adminClient,
+        user.id,
+        pendingPayment.orderId,
+        "retry",
+      );
+      if (resolution.state !== "retryable") {
+        return NextResponse.json({
+          message: resolution.message,
+          pendingOrderId: pendingPayment.orderId,
+          pendingPaymentStatus: pendingPayment.paymentStatus,
+        }, { status: 409 });
       }
     }
+  } catch (pendingError) {
+    console.error(
+      "No se pudo resolver un intento Webpay anterior antes de iniciar otro:",
+      pendingError instanceof Error ? pendingError.message : "error desconocido",
+    );
+    return NextResponse.json({
+      message: "No pudimos verificar un pago anterior con Transbank. Revisa Pagos pendientes en tu perfil antes de volver a pagar.",
+    }, { status: 502 });
   }
 
   const { data: checkoutData, error: createError } = await adminClient.rpc("create_webpay_checkout", {
     p_user_id: user.id,
-    p_shipping_address: body.shippingAddress,
+    p_shipping_address: body.shippingMethod === "pickup"
+      ? "Acordar con el vendedor"
+      : body.shippingAddress,
     p_shipping_method: body.shippingMethod,
     p_child_commerce_codes: getTestChildCommerceCodes(),
   });
