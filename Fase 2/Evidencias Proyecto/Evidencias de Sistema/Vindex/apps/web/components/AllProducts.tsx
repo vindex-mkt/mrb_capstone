@@ -1,4 +1,5 @@
 import ProductCard from "@/components/ProductCard";
+import Link from "next/link";
 import { formatProductPrice, getActiveDiscountPrice, getAllPublishedProducts, getDiscountLabel, getProductImage } from "@/lib/supabase/queries";
 
 export default async function AllProducts() {
@@ -16,21 +17,30 @@ export default async function AllProducts() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              id={product.id}
-              name={product.name ?? "Producto sin nombre"}
-              price={formatProductPrice(product.sale_type === "auction"
-                ? product.current_bid ?? product.starting_price ?? null
-                : getActiveDiscountPrice(product) ?? product.price)}
-              image={getProductImage(product)}
-              previousPrice={getActiveDiscountPrice(product) !== null ? formatProductPrice(product.price) : undefined}
-              discount={getDiscountLabel(product)}
-              saleType={product.sale_type}
-              currentBid={product.current_bid}
-            />
+          {products.slice(0, 16).map((product, index) => (
+            <div key={product.id} className={index >= 12 ? "hidden lg:block" : index >= 8 ? "hidden md:block" : undefined}>
+              <ProductCard
+                id={product.id}
+                name={product.name ?? "Producto sin nombre"}
+                price={formatProductPrice(product.sale_type === "auction"
+                  ? product.current_bid ?? product.starting_price ?? null
+                  : getActiveDiscountPrice(product) ?? product.price)}
+                image={getProductImage(product)}
+                previousPrice={getActiveDiscountPrice(product) !== null ? formatProductPrice(product.price) : undefined}
+                discount={getDiscountLabel(product)}
+                saleType={product.sale_type}
+                currentBid={product.current_bid}
+              />
+            </div>
           ))}
+        </div>
+        <div className="mt-6 flex justify-center">
+          <Link
+            href="/tienda"
+            className="link-more rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+          >
+            Ver todos
+          </Link>
         </div>
         {products.length === 0 && <p className="text-sm text-muted-foreground">Aún no hay productos publicados.</p>}
       </div>
