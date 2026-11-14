@@ -19,6 +19,7 @@ type ConversationRow = {
 type ConversationItem = ConversationRow & {
   otherName: string;
   productName: string;
+  productImage: string | null;
   lastMessage: string | null;
   activityAt: string;
 };
@@ -160,7 +161,7 @@ export default function MessagesInbox({
         const [profilesResult, productsResult, messagesResult] = await Promise.all([
           supabase.from("profiles").select("id, full_name").in("id", profileIds),
           productIds.length
-            ? supabase.from("products").select("id, name").in("id", productIds)
+            ? supabase.from("products").select("id, name, images").in("id", productIds)
             : Promise.resolve({ data: [], error: null }),
           supabase
             .from("messages")
@@ -179,6 +180,9 @@ export default function MessagesInbox({
         const namesByProduct = new Map(
           (productsResult.data ?? []).map((product) => [product.id, product.name]),
         );
+        const imagesByProduct = new Map(
+          (productsResult.data ?? []).map((product) => [product.id, product.images?.[0] ?? null]),
+        );
         const latestActivityByConversation = new Map<number, string>();
         for (const message of messagesResult.data ?? []) {
           const id = Number(message.conversation_id);
@@ -196,6 +200,7 @@ export default function MessagesInbox({
             productName: row.product_id === null
               ? "Producto no disponible"
               : namesByProduct.get(row.product_id) || "Producto no disponible",
+            productImage: row.product_id === null ? null : imagesByProduct.get(row.product_id) ?? null,
             lastMessage: null,
             activityAt,
           };
@@ -461,12 +466,43 @@ export default function MessagesInbox({
             ) : (
               <>
                 <header className="border-b border-border px-5 py-4">
-                  <h2 className="font-semibold text-foreground">
-                    {activeConversation?.otherName ?? "Conversación"}
-                  </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {activeConversation?.productName ?? "Cargando producto..."}
-                  </p>
+                  {activeConversation?.product_id !== null && activeConversation ? (
+                    <Link
+                      href={`/product/${activeConversation.product_id}`}
+                      className="flex w-fit max-w-full items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+                      aria-label={`Ver producto ${activeConversation.productName}`}
+                    >
+                      <img
+                        src={activeConversation.productImage ?? `https://picsum.photos/seed/vindex-product-${activeConversation.product_id}/120/120`}
+                        alt=""
+                        className="size-12 shrink-0 rounded-lg object-cover"
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-foreground transition hover:text-brand-700">
+                          {activeConversation.otherName}
+                        </span>
+                        <span className="mt-1 block truncate text-sm text-muted-foreground">
+                          {activeConversation.productName}
+                        </span>
+                      </span>
+                    </Link>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <img
+                        src="https://picsum.photos/seed/vindex-product/120/120"
+                        alt=""
+                        className="size-12 shrink-0 rounded-lg object-cover"
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-foreground">
+                          {activeConversation?.otherName ?? "Conversación"}
+                        </span>
+                        <span className="mt-1 block truncate text-sm text-muted-foreground">
+                          {activeConversation?.productName ?? "Cargando producto..."}
+                        </span>
+                      </span>
+                    </div>
+                  )}
                 </header>
 
                 {realtimeError && (

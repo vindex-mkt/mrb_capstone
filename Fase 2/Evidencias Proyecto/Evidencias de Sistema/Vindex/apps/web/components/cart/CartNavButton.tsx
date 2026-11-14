@@ -11,7 +11,7 @@ export default function CartNavButton() {
   return (
     <Link
       href="/cart"
-      className="icon-btn h-10 w-10"
+      className="icon-btn h-9 w-9 sm:h-10 sm:w-10"
       aria-label={itemCount > 0 ? `Ver carrito, ${itemCount} productos` : "Ver carrito"}
     >
       <ShoppingCart className="h-5 w-5" aria-hidden="true" />

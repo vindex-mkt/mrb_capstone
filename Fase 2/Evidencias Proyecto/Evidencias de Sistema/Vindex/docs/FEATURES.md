@@ -44,8 +44,22 @@ Status: 🟡 En desarrollo
 - [x] Iniciar o reutilizar una conversación desde el detalle de un producto de compra directa
 - [x] Abrir el acceso a mensajería desde las publicaciones recientes y solicitar login cuando sea necesario
 - [x] Listar conversaciones con el nombre de la otra parte y el producto asociado
+- [x] Abrir una conversación desde su notificación y acceder al producto desde el encabezado del chat
 - [x] Cargar historial, enviar mensajes y recibir inserciones mediante Supabase Realtime
 - [x] Restringir el acceso a las conversaciones y mensajes mediante las políticas RLS existentes
+
+---
+
+## Notificaciones
+
+- [x] Mostrar una campana en el navbar de escritorio y móvil, antes de favoritos
+- [x] Notificar compras confirmadas al comprador y nuevas ventas al vendedor
+- [x] Notificar mensajes entrantes al otro participante de la conversación
+- [x] Actualizar notificaciones en tiempo real y permitir marcarlas como leídas
+- [x] Restringir la consulta y actualización de notificaciones a su propietario
+- [ ] Notificaciones de pujas superadas y resultados de subastas
+
+Las notificaciones se crean en la base de datos al confirmar una orden o insertar un mensaje. Aplicar `supabase/migrations/20261113190000_notifications.sql` para crear la tabla y los triggers, y `supabase/migrations/20261113223700_enrich_message_notifications.sql` para incluir el nombre del remitente, el producto asociado y el enlace directo a la conversación.
 
 ---
 

@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import CartNavButton from "@/components/cart/CartNavButton";
 import WalletNavButton from "@/components/wallet/WalletNavButton";
 import { useFavorites } from "@/hooks/useFavorites";
+import NotificationsNavButton from "@/components/NotificationsNavButton";
 import {
   IconHeart,
   IconMessageCircle,
@@ -130,13 +131,13 @@ export default function Navbar() {
       {/* Cabecera principal */}
       <div className="border-b border-border bg-surface/95 backdrop-blur">
         <div className="container-site">
-          <div className="flex h-16 items-center gap-3 sm:h-20 sm:gap-5">
+          <div className="flex h-16 items-center gap-2 sm:h-20 sm:gap-5">
             {/* Logo */}
             <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="Vindex, ir al inicio">
               <img
                 src="/logo.png" 
                 alt="Logo de Vindex" 
-                className="mx-auto h-14 w-auto object-contain sm:h-20"
+                className="mx-auto h-10 w-auto object-contain sm:h-20"
              />
             </Link>
 
@@ -144,7 +145,7 @@ export default function Navbar() {
             <div className="hidden flex-1 md:block">{searchField()}</div>
 
             {/* Acciones */}
-            <div className="ml-auto flex items-center gap-1 sm:gap-2">
+            <div className="ml-auto flex items-center gap-0 sm:gap-2">
               {accountName ? (
                 <div
                   className="group relative flex items-center"
@@ -209,7 +210,9 @@ export default function Navbar() {
                 </Link>
               )}
 
-              <Link href="/favorites" className="icon-btn h-10 w-10" aria-label={`Mis favoritos, ${favoriteCount} productos`}>
+              <NotificationsNavButton />
+
+              <Link href="/favorites" className="icon-btn h-9 w-9 sm:h-10 sm:w-10" aria-label={`Mis favoritos, ${favoriteCount} productos`}>
                 <IconHeart className="h-5 w-5" />
                 {favoriteCount > 0 && <span className="count-badge">{favoriteCount > 99 ? "99+" : favoriteCount}</span>}
               </Link>
@@ -222,7 +225,7 @@ export default function Navbar() {
                 href="/vender"
                 aria-label="Vender"
                 title="Vender"
-                className="btn btn-primary h-10 w-10 px-0 sm:w-auto sm:px-4"
+                className="btn btn-primary h-9 w-9 px-0 sm:h-10 sm:w-auto sm:px-4"
               >
                 <IconPlus className="h-4 w-4" aria-hidden="true" />
                 <span className="hidden sm:inline">Vender</span>

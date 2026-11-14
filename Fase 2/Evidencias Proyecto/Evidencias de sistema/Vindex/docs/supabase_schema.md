@@ -156,6 +156,19 @@ CREATE TABLE public.messages (
   CONSTRAINT messages_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id),
   CONSTRAINT messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.profiles(id)
 );
+CREATE TABLE public.notifications (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  user_id uuid NOT NULL,
+  type text NOT NULL CHECK (type IN ('purchase', 'sale', 'message')),
+  title text NOT NULL,
+  body text NOT NULL,
+  href text NOT NULL,
+  event_key text NOT NULL UNIQUE,
+  read_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+);
 CREATE TABLE public.orders (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   buyer_id uuid NOT NULL,

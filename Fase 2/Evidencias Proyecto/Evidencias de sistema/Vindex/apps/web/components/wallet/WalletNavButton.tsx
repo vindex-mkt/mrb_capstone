@@ -36,7 +36,7 @@ export default function WalletNavButton() {
     >
       <button
         type="button"
-        className="icon-btn h-10 w-10"
+        className="icon-btn h-9 w-9 sm:h-10 sm:w-10"
         aria-label="Abrir billetera Vindex"
         aria-expanded={open}
         aria-controls="wallet-nav-panel"
