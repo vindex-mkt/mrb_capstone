@@ -41,7 +41,7 @@ export default function PublicStorePage() {
         const [{ data: ratingRow, error: ratingError }, { data: categoryRows, error: categoryError }, { data: productRows, error: productError }] = await Promise.all([
           supabase.from("store_ratings").select("average_rating, total_reviews").eq("store_id", storeRow.id).maybeSingle(),
           supabase.from("store_categories").select("id, name").eq("store_id", storeRow.id).order("name", { ascending: true }),
-          supabase.from("products").select("*").eq("store_id", storeRow.id).eq("status", true).gt("stock", 0).order("created_at", { ascending: false }),
+          supabase.from("products").select("*").eq("store_id", storeRow.id).eq("moderation_status", "approved").in("status", ["active", "true"]).gt("stock", 0).order("created_at", { ascending: false }),
         ]);
         if (ratingError) throw ratingError;
         if (categoryError) throw categoryError;

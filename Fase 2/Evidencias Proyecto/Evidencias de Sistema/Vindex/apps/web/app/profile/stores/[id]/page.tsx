@@ -165,7 +165,8 @@ export default function StoreAdminPage() {
         .select("id, name, images, sale_type, status, created_at")
         .eq("seller_id", user.id)
         .is("store_id", null)
-        .eq("status", true)
+        .eq("moderation_status", "approved")
+        .in("status", ["active", "true"])
         .order("created_at", { ascending: false });
       if (error) throw error;
       setUnassignedProducts((data ?? []) as StoreProduct[]);

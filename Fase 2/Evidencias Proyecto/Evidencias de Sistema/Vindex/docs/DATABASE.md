@@ -36,6 +36,8 @@ create table public.products (
 
 En la base de datos actual, `status` es texto y el valor `'true'` representa una publicación activa. Los campos promocionales permiten fechas de expiración nulas cuando la promoción correspondiente está desactivada.
 
+La moderación mantiene `products.status` como estado comercial y agrega `products.moderation_status`. Aplica [`20261114150000_add_product_moderation.sql`](../supabase/migrations/20261114150000_add_product_moderation.sql) para crear el historial, los resultados de detección y las políticas iniciales. Si esa migración ya se ejecutó, aplica también [`20261114161000_fix_product_moderation_write_policies.sql`](../supabase/migrations/20261114161000_fix_product_moderation_write_policies.sql); esta última aprueba de forma conservadora los productos existentes sin coincidencias de riesgo y permite guardar los resultados de texto y las decisiones administrativas. La decisión administrativa se ejecuta mediante la función protegida [`20261114173000_add_moderate_product_rpc.sql`](../supabase/migrations/20261114173000_add_moderate_product_rpc.sql), que verifica el rol y guarda estado e historial en una sola transacción.
+
 BUCKET NAME:
 
 product-images

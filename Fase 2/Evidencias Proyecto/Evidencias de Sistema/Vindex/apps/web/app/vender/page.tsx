@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { featuredPlans, startAdvertisingPayment } from "@/lib/advertising";
+import { analyzeProductTextForModeration } from "@/lib/moderation";
 
 type SelectedImage = {
 	file: File;
@@ -474,6 +475,15 @@ export default function SellProductPage() {
 			const productSlug = slug || `${toSlug(name)}-${createSlugSuffix()}`;
 			const now = new Date();
 			const productDiscountPrice = !isAuction && discountPrice.trim() ? parseClpInput(discountPrice) : null;
+			const categoryName = categories.find((item) => item.id === categoryId)?.name ?? null;
+			const moderationReview = analyzeProductTextForModeration({
+				title: name,
+				description,
+				categoryName,
+				tags: [],
+			});
+			const moderationStatus = moderationReview.moderationStatus;
+			const canPublish = isPublished && moderationStatus === "approved";
 			const { data: product, error: productError } = await supabase.from("products").insert({
 				seller_id: user.id,
 				store_id: storeId ? Number(storeId) : null,
@@ -491,7 +501,11 @@ export default function SellProductPage() {
 				featured_until: null,
 				stock: Number(stock),
 				condition,
-				status: false,
+				status: isPublished ? "true" : "false",
+				moderation_status: moderationStatus,
+				moderation_reason: moderationReview.reason,
+				moderated_at: null,
+				moderated_by: null,
 				images: [],
 				sale_type: isAuction ? "auction" : "direct",
 				is_auction: isAuction,
@@ -506,6 +520,21 @@ export default function SellProductPage() {
 			}).select("id").single();
 
 			if (productError) throw new Error(productError.message);
+
+			const matchedSignals = moderationReview.signals.filter((signal) => signal.result === "matched");
+			if (matchedSignals.length > 0) {
+				const { error: detectionError } = await supabase.from("product_detection_results").insert(
+					matchedSignals.map((signal) => ({
+						product_id: product.id,
+						detector_type: signal.detector,
+						risk_category: signal.category,
+						result: moderationStatus,
+						reason: signal.reason,
+						detector_version: signal.detectorVersion ?? "text-v1",
+					})),
+				);
+				if (detectionError) throw new Error(`No se pudo guardar el resultado de moderación: ${detectionError.message}`);
+			}
 
 			const imageErrors: string[] = [];
 			const imageUrls = await uploadProductImages(
@@ -530,7 +559,7 @@ export default function SellProductPage() {
 
 			const { error: imagesUpdateError } = await supabase
 				.from("products")
-				.update({ images: imageUrls, status: isPublished })
+				.update({ images: imageUrls })
 				.eq("id", product.id);
 			if (imagesUpdateError) {
 				const { error: deleteError } = await supabase
@@ -567,11 +596,16 @@ export default function SellProductPage() {
 			setIsAuction(false);
 			setShippingAvailable(true);
 			setIsPublished(true);
+			const publicationMessage = moderationStatus === "approved"
+				? isPublished ? "El producto se publicó correctamente." : "El producto quedó guardado como borrador."
+				: moderationStatus === "flagged"
+					? "El producto quedó oculto y fue enviado a revisión prioritaria."
+					: "El producto quedó oculto y pendiente de revisión manual.";
 			showCenteredSuccess(imageErrors.length > 0
-				? "El producto se publicó, pero algunas imágenes no pudieron procesarse."
-				: "El producto se publicó correctamente.");
+				? `${publicationMessage} Algunas imágenes no pudieron procesarse.`
+				: publicationMessage);
 
-			if (promoteAfterPublish) {
+			if (promoteAfterPublish && canPublish) {
 				try {
 					await startAdvertisingPayment(product.id, promotionDurationDays);
 				} catch (paymentError) {

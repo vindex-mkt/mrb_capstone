@@ -114,7 +114,8 @@ function ShopCatalog() {
                 supabase
                     .from("products")
                     .select("id, name, slug, description, price, discount_price, offer_ends_at, images, stock, seller_id, store_id, condition, category_id, created_at")
-                    .eq("status", true)
+                    .eq("moderation_status", "approved")
+                    .in("status", ["active", "true"])
                     .in("sale_type", ["direct", "fixed_price"])
                     .gt("stock", 0)
                     .order("created_at", { ascending: false }),

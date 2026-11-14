@@ -25,7 +25,8 @@ export async function getFeaturedProducts(): Promise<ProductListing[]> {
 		.select("*")
 		.eq("is_featured", true)
 		.gt("featured_until", now)
-		.eq("status", true)
+		.eq("moderation_status", "approved")
+		.in("status", ["active", "true"])
 		.gt("stock", 0)
 		.limit(6);
 
@@ -45,7 +46,8 @@ export async function getDailyDeals(): Promise<ProductListing[]> {
 		.select("*")
 		.not("discount_price", "is", null)
 		.gt("offer_ends_at", now)
-		.eq("status", true)
+		.eq("moderation_status", "approved")
+		.in("status", ["active", "true"])
 		.gt("stock", 0)
 		.order("offer_ends_at", { ascending: true });
 
@@ -62,7 +64,8 @@ export async function getLatestProducts(): Promise<ProductListing[]> {
 	const { data, error } = await supabase
 		.from("products")
 		.select("*")
-		.eq("status", true)
+		.eq("moderation_status", "approved")
+		.in("status", ["active", "true"])
 		.gt("stock", 0)
 		.order("created_at", { ascending: false })
 		.limit(8);
@@ -80,7 +83,8 @@ export async function getAllPublishedProducts(): Promise<ProductListing[]> {
 	const { data, error } = await supabase
 		.from("products")
 		.select("*")
-		.eq("status", true)
+		.eq("moderation_status", "approved")
+		.in("status", ["active", "true"])
 		.gt("stock", 0)
 		.order("created_at", { ascending: false });
 
@@ -104,6 +108,7 @@ export async function getProductById(productId: number): Promise<ProductListing 
 			)
 		`)
 		.eq("id", productId)
+		.eq("moderation_status", "approved")
 		.single();
 
 	if (error) {
@@ -186,6 +191,7 @@ export async function getProductBySlug(slug: string): Promise<ProductListing | n
 			)
 		`)
 		.eq("slug", slug)
+		.eq("moderation_status", "approved")
 		.single();
 
 	if (error) {
@@ -208,7 +214,8 @@ export async function getActiveAuctions(): Promise<AuctionProduct[]> {
 			)
 		`)
 		.eq("sale_type", "auction")
-		.eq("status", true)
+		.eq("moderation_status", "approved")
+		.in("status", ["active", "true"])
 		.gt("stock", 0)
 		.gt("auction_ends_at", new Date().toISOString())
 		.order("auction_ends_at", { ascending: true });

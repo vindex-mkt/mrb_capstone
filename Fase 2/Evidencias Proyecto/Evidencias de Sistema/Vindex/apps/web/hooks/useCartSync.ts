@@ -16,6 +16,7 @@ type CartProduct = {
   store_id: number | null;
   sale_type: string | null;
   status: boolean | string | null;
+  moderation_status: string | null;
   offer_ends_at: string | null;
 };
 
@@ -26,13 +27,15 @@ type JoinedCartItem = {
 };
 
 const productFields =
-  "id, name, price, discount_price, stock, images, seller_id, store_id, sale_type, status, offer_ends_at";
+  "id, name, price, discount_price, stock, images, seller_id, store_id, sale_type, status, moderation_status, offer_ends_at";
 const fallbackImage = "https://picsum.photos/seed/vindex-product/600/600";
 
 const toCartItem = (product: CartProduct, quantity: number): CartItem | null => {
   const stock = Math.max(Math.floor(Number(product.stock) || 0), 0);
   const price = Number(product.price);
-  const isActive = product.status === true || product.status === "true";
+  const isActive =
+    (product.status === "active" || product.status === "true" || product.status === true)
+    && product.moderation_status === "approved";
   if (
     !isActive ||
     !["direct", "fixed_price"].includes(product.sale_type ?? "") ||
@@ -144,7 +147,8 @@ export function useCartSync() {
             .from("products")
             .select(productFields)
             .in("id", missingLocalIds)
-            .eq("status", true)
+            .eq("moderation_status", "approved")
+            .in("status", ["active", "true"])
             .in("sale_type", ["direct", "fixed_price"])
             .gt("stock", 0);
           if (productsError) throw productsError;

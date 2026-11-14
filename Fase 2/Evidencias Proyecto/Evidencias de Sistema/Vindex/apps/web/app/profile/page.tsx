@@ -42,6 +42,9 @@ type SellerProduct = {
   current_bid: number | null;
   bid_increment: number | null;
   auction_ends_at: string | null;
+  moderation_status: string | null;
+  moderation_reason: string | null;
+  moderated_at: string | null;
   created_at: string;
 };
 
@@ -151,9 +154,8 @@ export default function ProfilePage() {
       const [productsResult, categoriesResult] = await Promise.all([
         supabase
           .from("products")
-          .select("id, name, description, category_id, price, stock, images, discount_price, offer_ends_at, is_featured, featured_until, sale_type, starting_price, current_bid, bid_increment, auction_ends_at, created_at")
+          .select("id, name, description, category_id, price, stock, images, discount_price, offer_ends_at, is_featured, featured_until, sale_type, starting_price, current_bid, bid_increment, auction_ends_at, moderation_status, moderation_reason, moderated_at, created_at")
           .eq("seller_id", user.id)
-          .eq("status", true)
           .order("created_at", { ascending: false }),
         supabase.from("categories").select("id, name").order("name", { ascending: true }),
       ]);
@@ -344,10 +346,9 @@ export default function ProfilePage() {
 
       const { data, error } = await supabase
         .from("products")
-        .update({ status: false })
+        .update({ status: "false" })
         .eq("id", product.id)
         .eq("seller_id", user.id)
-        .eq("status", true)
         .select("id")
         .maybeSingle();
 
@@ -643,6 +644,13 @@ export default function ProfilePage() {
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div>
                                   <h3 className="font-semibold text-foreground">{product.name ?? "Producto sin nombre"}</h3>
+                                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <Badge variant={product.moderation_status === "approved" ? "default" : product.moderation_status === "rejected" ? "destructive" : product.moderation_status === "flagged" ? "secondary" : "outline"}>
+                                      {product.moderation_status === "approved" ? "Aprobado" : product.moderation_status === "rejected" ? "Rechazado" : product.moderation_status === "flagged" ? "Prioridad" : product.moderation_status === "pending_review" ? "Pendiente" : "Sin revisar"}
+                                    </Badge>
+                                    {product.moderated_at && <span className="text-xs text-muted-foreground">Última revisión: {new Date(product.moderated_at).toLocaleString("es-CL")}</span>}
+                                  </div>
+                                  {product.moderation_reason && <p className="mt-2 text-sm text-muted-foreground">Motivo: {product.moderation_reason}</p>}
                                   <p className="mt-1 text-sm text-muted-foreground">
                                     {isAuction ? "Puja actual / inicial: " : ""}
                                     {new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(displayedPrice ?? 0)}
