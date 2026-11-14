@@ -46,8 +46,11 @@ Status: 🟡 En desarrollo
 - [x] Métricas de ventas pagadas, pedidos pendientes y entregas pendientes
 - [x] Tendencia mensual de ventas brutas, pedidos y compradores de los últimos seis meses
 - [x] Métricas de usuarios, tiendas, pujas, favoritos, reseñas y mensajería
+- [x] Comisión de vendedor del 5% sobre el subtotal de productos pagados, excluyendo envío
+- [x] Historial financiero idempotente y filtros de día, mes y año
+- [x] Ingresos por promociones diferenciados de comisiones y ventas brutas
 
-Las ventas del dashboard se calculan con el subtotal de pedidos pagados (`paid`, `completed` o `delivered`). Se muestran como ventas brutas: no son utilidad neta porque el modelo actual no registra costos ni comisiones. Si alguna tabla no está disponible en la base de datos configurada, el panel lo indica como métrica no disponible.
+Las ventas del dashboard se calculan con el subtotal de pedidos pagados (`paid`, `completed` o `delivered`) y se muestran como ventas brutas de vendedores, nunca como ingresos de Vindex. La comisión se registra una sola vez por línea pagada y queda pendiente de liquidación; no cambia el importe de las subtransacciones Webpay Plus Mall. Las promociones son ingresos independientes y sus autorizaciones actuales corresponden al sandbox, no a fondos reales recibidos. Los ingresos registrados de Vindex suman las comisiones efectivamente marcadas como cobradas y las promociones autorizadas en sandbox. La utilidad neta sigue sin poder calcularse porque no se registran costos operativos.
 
 ---
 

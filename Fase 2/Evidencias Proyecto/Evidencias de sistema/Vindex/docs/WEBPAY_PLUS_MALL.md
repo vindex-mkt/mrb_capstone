@@ -28,6 +28,14 @@ Aplicar `supabase/migrations/20261105200000_webpay_plus_mall.sql` en Supabase an
 6. La orden se marca `paid`, `partially_paid`, `payment_failed` o `payment_review`. En autorización parcial se registra cada comercio por separado, se conserva la compra autorizada y solo se restituye el stock de la rechazada. La cesta elimina únicamente cantidades autorizadas; no se reintenta ni se reembolsa automáticamente. Una autorización parcial requiere revisión y eventual compensación manual mediante las operaciones habilitadas por Transbank.
 7. Cancelaciones restituyen las reservas sin borrar el carrito. Una falla de comunicación durante `commit` deja la operación en revisión y conserva la reserva: no se repite el cobro a ciegas; se debe revisar el estado con Transbank antes de tomar una acción.
 
+## Comisión del vendedor e ingresos de Vindex
+
+La migración incremental `supabase/migrations/20261114184640_commission_ledger_and_admin_revenue.sql` registra el 5% del subtotal de cada línea confirmada (precio final × cantidad, sin envío) en `order_commissions`. El registro requiere que la subtransacción del vendedor esté `authorized`, tenga `response_code = 0` y la orden haya alcanzado un estado pagado; una restricción única por línea evita duplicados. Rechazos, cancelaciones y pagos sin autorización o incompletos no generan comisión, y no se aplican cargos retroactivos a órdenes anteriores a la migración. La comisión parte como `pending_settlement`: no se altera el monto enviado a Webpay Mall ni se afirma que Vindex haya recibido ese dinero. La liquidación real mediante un futuro comercio hijo de Vindex queda fuera de esta implementación.
+
+Las promociones continúan siendo cobros independientes con Webpay Plus de integración: 1 día CLP 990, 3 días CLP 1.990, 7 días CLP 3.990 y 14 días CLP 6.990. El dashboard separa comisiones generadas, cobradas y pendientes de liquidación, registra las promociones autorizadas en sandbox y filtra por día/mes/año de Chile. Sus ingresos registrados suman las comisiones cobradas y autorizaciones de promociones sandbox; estas últimas no equivalen a dinero real recibido. Las ventas brutas completas de los vendedores permanecen como una métrica separada y nunca se cuentan como ganancia de Vindex.
+
+El trigger procesa también órdenes pagadas creadas por otros medios. Para subastas, la comisión se calcula si el precio ganador queda guardado como `order_items.unit_price` en una orden pagada; el flujo actual no cierra ni crea órdenes para subastas, por lo que una puja por sí sola no genera comisión.
+
 La interfaz impide agregar un tercer comercio lógico y muestra el mensaje de límite. El servidor repite esa validación usando los datos actuales de Supabase, por lo que cambiar el contenido del navegador no la evita. Al quitar todos los productos de un comercio, la validación del carrito se recalcula y permite incorporar otro.
 
 ## Pagos pendientes: conciliación, reintento y cancelación

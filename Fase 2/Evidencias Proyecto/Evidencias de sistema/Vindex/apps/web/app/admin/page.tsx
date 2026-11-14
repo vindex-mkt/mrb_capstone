@@ -15,6 +15,7 @@ import {
   IconWallet,
   type IconProps,
 } from "@/components/icons";
+import FinanceRevenuePanel from "@/components/admin/FinanceRevenuePanel";
 
 type DashboardStats = {
   generatedAt: string;
@@ -275,7 +276,7 @@ export default function AdminDashboardPage() {
         <MetricCard
           title="Utilidad neta"
           value="No disponible"
-          detail="No hay costos ni comisión registrados"
+          detail="Faltan costos operativos y liquidaciones efectivas"
           icon={IconWallet}
         />
         <MetricCard
@@ -291,6 +292,8 @@ export default function AdminDashboardPage() {
           icon={IconBolt}
         />
       </section>
+
+      <FinanceRevenuePanel />
 
       {stats.unavailableMetrics.length > 0 && (
         <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">

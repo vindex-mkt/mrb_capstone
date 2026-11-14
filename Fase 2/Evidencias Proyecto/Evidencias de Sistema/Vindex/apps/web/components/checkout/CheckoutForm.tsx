@@ -14,6 +14,7 @@ import { CHILE_LOCATIONS } from "@/lib/chile-locations";
 import { formatProductPrice } from "@/lib/formatters";
 import { useCartStore } from "@/lib/store/useCartStore";
 import { getMerchantKey, MAX_CART_MERCHANTS_MESSAGE } from "@/lib/checkout/merchant";
+import { calculateSellerCommission } from "@/lib/checkout/commission";
 
 type Address = {
   region: string;
@@ -55,6 +56,9 @@ export default function CheckoutForm() {
   const items = useCartStore((state) => state.items);
   const hasHydrated = useCartStore((state) => state.hasHydrated);
   const subtotal = useCartStore((state) => state.getTotal());
+  const sellerCommission = calculateSellerCommission(
+    items.map(({ price, quantity }) => ({ unitPrice: price, quantity })),
+  );
   const [profileAddress, setProfileAddress] = useState<Address | null>(null);
   const [address, setAddress] = useState<Address>(emptyAddress);
   const [addressChoice, setAddressChoice] = useState<"saved" | "new">("new");
@@ -383,6 +387,11 @@ export default function CheckoutForm() {
                 <div className="mt-5 space-y-3 border-t border-border pt-4 text-sm">
                   <div className="flex justify-between gap-3"><span className="text-muted-foreground">Subtotal</span><span className="font-medium text-foreground">{formatProductPrice(subtotal)}</span></div>
                   <div className="flex justify-between gap-3"><span className="text-muted-foreground">Envío</span><span className="font-medium text-foreground">{formatProductPrice(shippingCost)}</span></div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Comisión Vindex (5%, vendedor)</span>
+                    <span className="font-medium text-foreground">{formatProductPrice(sellerCommission)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Se descuenta de las ganancias del vendedor y no se suma al cobro del comprador.</p>
                   <div className="flex justify-between gap-3 border-t border-border pt-3 text-base"><span className="font-semibold text-foreground">Total</span><span className="font-extrabold text-foreground">{formatProductPrice(total)}</span></div>
                 </div>
                 <Button type="submit" className="mt-5 h-11 w-full bg-brand-600 text-white hover:bg-brand-700" disabled={submitting || !addressIsValid || exceedsMerchantLimit || pickupHasMultipleSellers}>

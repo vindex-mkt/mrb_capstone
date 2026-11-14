@@ -6,6 +6,8 @@ import FavoriteButton from "@/components/FavoriteButton";
 import ProductReviews from "@/components/reviews/ProductReviews";
 import MessageSellerButton from "@/components/messaging/MessageSellerButton";
 import { IconArrowRight, IconShieldCheck, IconStar, IconTruck } from "@/components/icons";
+import AdminSendToReviewButton from "./AdminSendToReviewButton";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatProductPrice, getActiveDiscountPrice, getProductById, getProductImage, getProductStoreName } from "@/lib/supabase/queries";
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -23,6 +25,26 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   }
 
   const storeName = await getProductStoreName(product);
+  const supabase = await createSupabaseServerClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  let isAdmin = false;
+
+  if (authError) {
+    console.error("No se pudo verificar permisos administrativos en la ficha del producto:", authError.message);
+  } else if (user) {
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("No se pudo consultar el rol administrativo en la ficha del producto:", profileError.message);
+    } else {
+      isAdmin = profile?.role === "admin";
+    }
+  }
+
   const activePrice = getActiveDiscountPrice(product) ?? product.price;
   const originalPrice = product.price ?? activePrice;
   const galleryImages = product.images && product.images.length > 0 ? product.images : [getProductImage(product)];
@@ -30,12 +52,15 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   return (
     <main className="min-h-screen bg-background">
       <section className="container-site py-8 sm:py-10">
-        <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/" className="hover:text-foreground">Inicio</Link>
-          <span>/</span>
-          <Link href="/tienda" className="hover:text-foreground">Tienda</Link>
-          <span>/</span>
-          <span className="text-foreground">{product.name ?? "Producto"}</span>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <nav aria-label="Ruta de navegación" className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Link href="/" className="hover:text-foreground">Inicio</Link>
+            <span>/</span>
+            <Link href="/tienda" className="hover:text-foreground">Tienda</Link>
+            <span>/</span>
+            <span className="text-foreground">{product.name ?? "Producto"}</span>
+          </nav>
+          {isAdmin && <AdminSendToReviewButton productId={product.id} />}
         </div>
 
         <div className="rounded-2xl border border-border bg-surface p-4 sm:p-6 lg:p-8">

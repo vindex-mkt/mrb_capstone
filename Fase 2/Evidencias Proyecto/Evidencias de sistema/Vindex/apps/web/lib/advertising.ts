@@ -1,8 +1,8 @@
 export const featuredPlans = [
-  { days: 1, price: 1990 },
-  { days: 3, price: 4990 },
-  { days: 7, price: 9990 },
-  { days: 14, price: 16990 },
+  { days: 1, price: 990 },
+  { days: 3, price: 1990 },
+  { days: 7, price: 3990 },
+  { days: 14, price: 6990 },
 ] as const;
 
 export async function startAdvertisingPayment(productId: number, durationDays: number) {
