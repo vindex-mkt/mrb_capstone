@@ -39,6 +39,18 @@ Status: 🟡 En desarrollo
 
 ---
 
+## Administración y Business Intelligence
+
+- [x] Dashboard administrativo protegido para usuarios con rol `admin`
+- [x] Métricas de catálogo publicado, moderación, ofertas y subastas
+- [x] Métricas de ventas pagadas, pedidos pendientes y entregas pendientes
+- [x] Tendencia mensual de ventas brutas, pedidos y compradores de los últimos seis meses
+- [x] Métricas de usuarios, tiendas, pujas, favoritos, reseñas y mensajería
+
+Las ventas del dashboard se calculan con el subtotal de pedidos pagados (`paid`, `completed` o `delivered`). Se muestran como ventas brutas: no son utilidad neta porque el modelo actual no registra costos ni comisiones. Si alguna tabla no está disponible en la base de datos configurada, el panel lo indica como métrica no disponible.
+
+---
+
 ## Mensajería
 
 - [x] Iniciar o reutilizar una conversación desde el detalle de un producto de compra directa

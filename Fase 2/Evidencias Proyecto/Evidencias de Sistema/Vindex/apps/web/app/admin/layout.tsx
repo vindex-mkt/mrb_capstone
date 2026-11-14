@@ -10,7 +10,7 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
             <p className="font-semibold text-foreground">Administración</p>
           </div>
           <nav aria-label="Administración" className="flex items-center gap-4 text-sm font-medium">
-            <Link href="/admin" className="text-muted-foreground hover:text-foreground">Panel</Link>
+            <Link href="/admin" className="text-muted-foreground hover:text-foreground">Dashboard</Link>
             <Link href="/admin/categories" className="text-brand-700 hover:text-brand-800">Categorías</Link>
             <Link href="/admin/moderation" className="text-brand-700 hover:text-brand-800">Moderación</Link>
             <Link href="/" className="text-muted-foreground hover:text-foreground">Volver a la tienda</Link>

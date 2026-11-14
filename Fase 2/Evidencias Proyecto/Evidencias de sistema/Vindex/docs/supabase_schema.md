@@ -1,6 +1,3 @@
--- WARNING: This schema is for context only and is not meant to be run.
--- Table order and constraints may not be valid for execution.
-
 CREATE TABLE public.products (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   store_id bigint,
@@ -30,8 +27,13 @@ CREATE TABLE public.products (
   winner_id uuid,
   store_category_id bigint,
   category_id uuid,
+  moderation_status text NOT NULL DEFAULT 'pending_review'::text CHECK (moderation_status = ANY (ARRAY['pending_review'::text, 'approved'::text, 'rejected'::text, 'flagged'::text])),
+  moderation_reason text,
+  moderated_at timestamp with time zone,
+  moderated_by uuid,
   CONSTRAINT products_pkey PRIMARY KEY (id),
   CONSTRAINT fk_products_profiles FOREIGN KEY (seller_id) REFERENCES public.profiles(id),
+  CONSTRAINT products_moderated_by_fkey FOREIGN KEY (moderated_by) REFERENCES public.profiles(id),
   CONSTRAINT products_store_category_id_fkey FOREIGN KEY (store_category_id) REFERENCES public.store_categories(id),
   CONSTRAINT products_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES auth.users(id),
   CONSTRAINT products_winner_id_fkey FOREIGN KEY (winner_id) REFERENCES auth.users(id),
@@ -298,4 +300,49 @@ CREATE TABLE public.notifications (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT notifications_pkey PRIMARY KEY (id),
   CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.product_moderation_reviews (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  product_id bigint NOT NULL,
+  admin_id uuid,
+  action text NOT NULL CHECK (action = ANY (ARRAY['approved'::text, 'rejected'::text, 'flagged'::text, 'resubmitted'::text])),
+  reason text,
+  detector_type text,
+  risk_category text,
+  result text,
+  reason_details text,
+  match_score numeric,
+  detector_version text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT product_moderation_reviews_pkey PRIMARY KEY (id),
+  CONSTRAINT product_moderation_reviews_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
+  CONSTRAINT product_moderation_reviews_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.product_detection_results (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  product_id bigint NOT NULL,
+  detector_type text NOT NULL CHECK (detector_type = ANY (ARRAY['text'::text, 'image'::text, 'category'::text, 'manual'::text])),
+  risk_category text,
+  result text,
+  reason text,
+  match_score numeric,
+  detector_version text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT product_detection_results_pkey PRIMARY KEY (id),
+  CONSTRAINT product_detection_results_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
+);
+CREATE TABLE public.product_reports (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  product_id bigint NOT NULL,
+  reporter_id uuid NOT NULL,
+  reason text NOT NULL,
+  details text,
+  is_resolved boolean NOT NULL DEFAULT false,
+  reviewed_by uuid,
+  reviewed_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT product_reports_pkey PRIMARY KEY (id),
+  CONSTRAINT product_reports_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
+  CONSTRAINT product_reports_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES auth.users(id),
+  CONSTRAINT product_reports_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.profiles(id)
 );
