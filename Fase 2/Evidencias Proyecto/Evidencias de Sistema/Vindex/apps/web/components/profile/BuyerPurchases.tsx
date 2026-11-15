@@ -86,6 +86,8 @@ export default function BuyerPurchases() {
   const [saving, setSaving] = useState(false);
   const [startingCoordinationOrderId, setStartingCoordinationOrderId] = useState<number | null>(null);
   const [refreshingCoordinationOrderId, setRefreshingCoordinationOrderId] = useState<number | null>(null);
+  const [confirmingDeliveryOrderId, setConfirmingDeliveryOrderId] = useState<number | null>(null);
+  const [heldEscrowOrderIds, setHeldEscrowOrderIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     let current = true;
@@ -120,6 +122,19 @@ export default function BuyerPurchases() {
         return;
       }
       if (!current) return;
+
+      const { data: heldEscrows, error: escrowError } = await supabase
+        .from("order_escrows")
+        .select("order_id")
+        .eq("buyer_id", user.id)
+        .eq("status", "held");
+      if (!current) return;
+      if (escrowError) {
+        setLoadError(`No se pudo verificar la custodia de tus órdenes: ${escrowError.message}`);
+        setLoading(false);
+        return;
+      }
+      setHeldEscrowOrderIds(new Set((heldEscrows ?? []).map((escrow) => escrow.order_id)));
 
       const pickupOrders = loadedOrders.filter((order) =>
         isPickupOrder(order) && ["paid", "completed", "delivered"].includes(order.status.toLowerCase()),
@@ -262,6 +277,43 @@ export default function BuyerPurchases() {
     }
   };
 
+  const confirmStandardDelivery = async (orderId: number) => {
+    setConfirmingDeliveryOrderId(orderId);
+    try {
+      const { data, error } = await supabase.rpc(
+        "confirm_standard_delivery_and_release_escrow",
+        { p_order_id: orderId },
+      );
+      if (error) throw error;
+
+      const result = data as { success?: unknown; message?: unknown } | null;
+      if (!result?.success) {
+        throw new Error(
+          typeof result?.message === "string"
+            ? result.message
+            : "No se pudo confirmar la entrega.",
+        );
+      }
+
+      setItems((current) => current.map((item) => item.order.id === orderId
+        ? { ...item, order: { ...item.order, delivery_status: "completed" } }
+        : item));
+      setHeldEscrowOrderIds((current) => {
+        const next = new Set(current);
+        next.delete(orderId);
+        return next;
+      });
+      showToast("Entrega confirmada y saldo virtual liberado al vendedor.", "success");
+    } catch (confirmationError) {
+      const message = confirmationError instanceof Error
+        ? confirmationError.message
+        : "Error desconocido";
+      showToast(`No se pudo confirmar la entrega: ${message}`, "error");
+    } finally {
+      setConfirmingDeliveryOrderId(null);
+    }
+  };
+
   const submitRating = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!ratingItem?.product_id || ratedProductIds.has(ratingItem.product_id)) return;
@@ -316,7 +368,7 @@ export default function BuyerPurchases() {
             {items.map((item, index) => {
               const pickupOrder = isPickupOrder(item.order);
               const deliveryCompleted = item.order.delivery_status === "completed";
-              const paymentConfirmed = ["paid", "completed", "delivered"].includes(item.order.status.toLowerCase());
+              const paymentConfirmed = ["paid", "partially_paid", "completed", "delivered"].includes(item.order.status.toLowerCase());
               const canRate = (pickupOrder
                 ? paymentConfirmed && deliveryCompleted
                 : ["paid", "completed", "delivered"].includes(item.order.status.toLowerCase())) && item.product_id !== null;
@@ -341,7 +393,7 @@ export default function BuyerPurchases() {
                         ? !paymentConfirmed
                           ? item.order.status === "partially_paid" ? "Pago parcialmente autorizado" : "Pago pendiente o rechazado"
                           : deliveryCompleted ? "Entregado" : "Pendiente de coordinación"
-                        : item.order.status}
+                        : deliveryCompleted ? "Entregado" : item.order.status}
                     </p>
                     {pickupOrder && paymentConfirmed && isFirstOrderItem && (
                       <div className={`mt-4 rounded-xl border p-4 ${deliveryCompleted ? "border-emerald-200 bg-emerald-50" : "border-brand-200 bg-brand-50/70"}`}>
@@ -353,7 +405,7 @@ export default function BuyerPurchases() {
                             <p className="mt-1 font-mono text-3xl font-extrabold tracking-[0.3em] text-brand-800" aria-label={`Código de retiro ${deliveryCode}`}>
                               {deliveryCode}
                             </p>
-                            <p className="mt-2 text-sm text-muted-foreground">Compártelo con el vendedor únicamente cuando tengas el producto en tus manos. La validación liberará los fondos retenidos.</p>
+                            <p className="mt-2 text-sm text-muted-foreground">Compártelo con el vendedor únicamente cuando tengas el producto en tus manos. La validación liberará el saldo virtual neto retenido.</p>
                           </>
                         ) : orderChats.length > 0 ? (
                           <>
@@ -399,6 +451,23 @@ export default function BuyerPurchases() {
                             </Button>
                           </>
                         )}
+                      </div>
+                    )}
+                    {!pickupOrder && paymentConfirmed && isFirstOrderItem && heldEscrowOrderIds.has(item.order.id) && (
+                      <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50/70 p-4">
+                        <p className="text-sm text-muted-foreground">
+                          Confirma la recepción solo cuando hayas recibido los productos pagados. Esto liberará el saldo virtual neto al vendedor.
+                        </p>
+                        <Button
+                          type="button"
+                          className="mt-3"
+                          disabled={confirmingDeliveryOrderId === item.order.id}
+                          onClick={() => void confirmStandardDelivery(item.order.id)}
+                        >
+                          {confirmingDeliveryOrderId === item.order.id
+                            ? "Confirmando entrega..."
+                            : "Confirmar recepción"}
+                        </Button>
                       </div>
                     )}
                   </div>

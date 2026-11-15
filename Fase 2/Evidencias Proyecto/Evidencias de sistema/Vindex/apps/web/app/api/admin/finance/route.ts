@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFinancePeriodRange, type FinancePeriod } from "@/lib/admin/finance-period";
+import { calculateMarketplaceFinancials } from "@/lib/checkout/commission";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -148,6 +149,16 @@ export async function GET(request: NextRequest) {
       .reduce((total, row) => total + toAmount(row.commission_amount), 0);
     const promotionIncome = authorizedPromotions
       .reduce((total, row) => total + toAmount(row.amount), 0);
+    const accruedFinancials = calculateMarketplaceFinancials(
+      generatedCommissions
+        .filter(({ status }) => status !== "reversed")
+        .map((row) => ({ unitPrice: toAmount(row.base_amount), quantity: 1 })),
+    );
+    const collectedFinancials = calculateMarketplaceFinancials(
+      collectedCommissions
+        .filter(({ status }) => status === "collected")
+        .map((row) => ({ unitPrice: toAmount(row.base_amount), quantity: 1 })),
+    );
 
     const historyByKey = new Map<string, {
       id: string;
@@ -214,6 +225,17 @@ export async function GET(request: NextRequest) {
         commissionsGenerated: commissionsGeneratedTotal,
         commissionsCollected: commissionsCollectedTotal,
         commissionsPending: pendingCommissions,
+        salesGross: accruedFinancials.salesGross,
+        vindexCommissionAccruedGross: accruedFinancials.vindexCommissionGross,
+        sellerVindexCommissionEstimate: accruedFinancials.sellerVindexCommission,
+        buyerVindexCommissionEstimate: accruedFinancials.buyerVindexCommission,
+        operationalCostsGross: accruedFinancials.operationalCostsGross,
+        sellerOperationalCost: accruedFinancials.sellerOperationalCost,
+        buyerOperationalCost: accruedFinancials.buyerOperationalCost,
+        vindexVatAssumedEstimate: accruedFinancials.vindexVatEstimate,
+        vindexNetAfterVatEstimate: accruedFinancials.vindexNetAfterVatEstimate,
+        sellerNetEstimate: accruedFinancials.sellerNetEstimate,
+        vindexCommissionCollectedNetAfterVatEstimate: collectedFinancials.vindexNetAfterVatEstimate,
         promotionsAuthorizedInSandbox: promotionIncome,
         totalRecordedIncome: commissionsCollectedTotal + promotionIncome,
       },

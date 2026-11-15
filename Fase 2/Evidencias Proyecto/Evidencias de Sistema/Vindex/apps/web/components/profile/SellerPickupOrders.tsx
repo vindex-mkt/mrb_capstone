@@ -189,7 +189,7 @@ export default function SellerPickupOrders() {
         ? { ...entry, order: { ...entry.order, delivery_status: "completed" } }
         : entry));
       setCodes((current) => ({ ...current, [orderId]: "" }));
-      showToast(result.message ?? "Entrega confirmada y fondos liberados al vendedor.", "success");
+      showToast(result.message ?? "Entrega confirmada y saldo virtual neto liberado al vendedor.", "success");
     } catch (verificationError) {
       const message = verificationError instanceof Error ? verificationError.message : "Error desconocido";
       showToast(`No se pudo validar la entrega: ${message}`, "error");
@@ -202,7 +202,7 @@ export default function SellerPickupOrders() {
     <Card className="border-border bg-surface">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg text-foreground"><KeyRound className="size-5 text-brand-700" />Mis Ventas · Entregas a coordinar</CardTitle>
-        <CardDescription>Responde al comprador por el chat para acordar la entrega. Los fondos solo se liberan al validar su código OTP cuando reciba el producto.</CardDescription>
+        <CardDescription>Responde al comprador por el chat para acordar la entrega. El saldo virtual neto solo se libera al validar su código OTP cuando reciba el producto.</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (

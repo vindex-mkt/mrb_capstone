@@ -22,6 +22,17 @@ type FinanceResponse = {
     commissionsGenerated: number;
     commissionsCollected: number;
     commissionsPending: number;
+    salesGross: number;
+    vindexCommissionAccruedGross: number;
+    sellerVindexCommissionEstimate: number;
+    buyerVindexCommissionEstimate: number;
+    operationalCostsGross: number;
+    sellerOperationalCost: number;
+    buyerOperationalCost: number;
+    vindexVatAssumedEstimate: number;
+    vindexNetAfterVatEstimate: number;
+    sellerNetEstimate: number;
+    vindexCommissionCollectedNetAfterVatEstimate: number;
     promotionsAuthorizedInSandbox: number;
     totalRecordedIncome: number;
   };
@@ -48,6 +59,17 @@ function isFinanceResponse(value: unknown): value is FinanceResponse {
     summary?.commissionsGenerated,
     summary?.commissionsCollected,
     summary?.commissionsPending,
+    summary?.salesGross,
+    summary?.vindexCommissionAccruedGross,
+    summary?.sellerVindexCommissionEstimate,
+    summary?.buyerVindexCommissionEstimate,
+    summary?.operationalCostsGross,
+    summary?.sellerOperationalCost,
+    summary?.buyerOperationalCost,
+    summary?.vindexVatAssumedEstimate,
+    summary?.vindexNetAfterVatEstimate,
+    summary?.sellerNetEstimate,
+    summary?.vindexCommissionCollectedNetAfterVatEstimate,
     summary?.promotionsAuthorizedInSandbox,
     summary?.totalRecordedIncome,
   ];
@@ -167,21 +189,81 @@ export default function FinanceRevenuePanel() {
       {data && !loading && !error && (
         <>
           <p className="text-xs text-muted-foreground">{data.periodLabel} · montos en CLP</p>
+          <h3 className="text-sm font-semibold text-foreground">Modelo financiero estimado sobre ventas confirmadas</h3>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <SummaryCard
-              title="Comisiones generadas"
+              title="Ventas brutas"
+              amount={data.summary.salesGross}
+              detail="Precio original de productos, sin envío"
+            />
+            <SummaryCard
+              title="Comisión Vindex bruta"
+              amount={data.summary.vindexCommissionAccruedGross}
+              detail="5% devengado sobre ventas brutas"
+            />
+            <SummaryCard
+              title="Parte vendedor · Vindex"
+              amount={data.summary.sellerVindexCommissionEstimate}
+              detail="50% de la comisión Vindex"
+            />
+            <SummaryCard
+              title="Parte comprador · Vindex"
+              amount={data.summary.buyerVindexCommissionEstimate}
+              detail="50% de la comisión Vindex"
+            />
+            <SummaryCard
+              title="Costos operacionales"
+              amount={data.summary.operationalCostsGross}
+              detail="1,7% por cada lado de la operación"
+            />
+            <SummaryCard
+              title="Costos operacionales · vendedor"
+              amount={data.summary.sellerOperationalCost}
+              detail="1,7% del precio original"
+            />
+            <SummaryCard
+              title="Costos operacionales · comprador"
+              amount={data.summary.buyerOperationalCost}
+              detail="1,7% del precio original"
+            />
+            <SummaryCard
+              title="IVA asumido por Vindex"
+              amount={data.summary.vindexVatAssumedEstimate}
+              detail="19% de la comisión bruta; no se cobra al comprador ni al vendedor"
+            />
+            <SummaryCard
+              title="Ingreso Vindex después del IVA"
+              amount={data.summary.vindexNetAfterVatEstimate}
+              detail="Estimación devengada; no implica que se haya recaudado"
+            />
+            <SummaryCard
+              title="Neto estimado vendedores"
+              amount={data.summary.sellerNetEstimate}
+              detail="Ventas menos las participaciones del vendedor; sin envío"
+            />
+          </div>
+
+          <h3 className="text-sm font-semibold text-foreground">Estado real del ledger</h3>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryCard
+              title="Comisiones devengadas"
               amount={data.summary.commissionsGenerated}
-              detail="5% de ventas confirmadas, sin incluir envío"
+              detail="Registradas en el ledger; no significa dinero recibido"
             />
             <SummaryCard
               title="Comisiones cobradas"
               amount={data.summary.commissionsCollected}
-              detail="Fondos liquidados a Vindex"
+              detail="Solo filas con estado collected"
             />
             <SummaryCard
               title="Pendientes de liquidación"
               amount={data.summary.commissionsPending}
-              detail="Registradas, no cobradas a los vendedores"
+              detail="Devengadas, todavía no cobradas"
+            />
+            <SummaryCard
+              title="Neto estimado de comisiones cobradas"
+              amount={data.summary.vindexCommissionCollectedNetAfterVatEstimate}
+              detail="Comisión cobrada menos el IVA estimado de Vindex"
             />
             <SummaryCard
               title="Promociones pagadas"
@@ -196,9 +278,9 @@ export default function FinanceRevenuePanel() {
           </div>
 
           <p className="rounded-xl bg-brand-50 p-4 text-xs leading-5 text-brand-800">
-            La comisión no modifica el monto de las subtransacciones Webpay Plus Mall y queda pendiente de liquidación.
-            Las promociones corresponden a autorizaciones sandbox, no a fondos reales recibidos. Los valores completos
-            de las ventas pertenecen a los vendedores y no se contabilizan como ingresos de Vindex.
+            Las participaciones del comprador y del vendedor, y los costos operacionales, son estimaciones derivadas de las ventas confirmadas.
+            No representan cobros ni liquidaciones. La RPC actual de Webpay Plus Mall mantiene sus montos y debe actualizarse en Supabase
+            antes de recaudar las nuevas participaciones. Las promociones autorizadas son transacciones sandbox y no equivalen a dinero real recibido.
           </p>
 
           <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-card">

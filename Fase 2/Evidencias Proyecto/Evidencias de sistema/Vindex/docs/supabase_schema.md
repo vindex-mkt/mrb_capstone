@@ -1,3 +1,4 @@
+
 CREATE TABLE public.products (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   store_id bigint,
@@ -345,4 +346,24 @@ CREATE TABLE public.product_reports (
   CONSTRAINT product_reports_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
   CONSTRAINT product_reports_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES auth.users(id),
   CONSTRAINT product_reports_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.order_commissions (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  order_id bigint NOT NULL,
+  order_item_id bigint NOT NULL UNIQUE,
+  payment_subtransaction_id uuid,
+  seller_id uuid NOT NULL,
+  store_id bigint,
+  base_amount bigint NOT NULL CHECK (base_amount > 0),
+  commission_rate_bps smallint NOT NULL DEFAULT 500 CHECK (commission_rate_bps > 0 AND commission_rate_bps <= 10000),
+  commission_amount bigint NOT NULL CHECK (commission_amount >= 0),
+  status text NOT NULL DEFAULT 'pending_settlement'::text CHECK (status = ANY (ARRAY['pending_settlement'::text, 'collected'::text, 'reversed'::text])),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  collected_at timestamp with time zone,
+  CONSTRAINT order_commissions_pkey PRIMARY KEY (id),
+  CONSTRAINT order_commissions_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT order_commissions_order_item_id_fkey FOREIGN KEY (order_item_id) REFERENCES public.order_items(id),
+  CONSTRAINT order_commissions_payment_subtransaction_id_fkey FOREIGN KEY (payment_subtransaction_id) REFERENCES public.payment_subtransactions(id),
+  CONSTRAINT order_commissions_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES public.profiles(id),
+  CONSTRAINT order_commissions_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id)
 );

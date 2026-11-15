@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CreditCard, MapPin, Store, Truck } from "lucide-react";
@@ -14,7 +14,7 @@ import { CHILE_LOCATIONS } from "@/lib/chile-locations";
 import { formatProductPrice } from "@/lib/formatters";
 import { useCartStore } from "@/lib/store/useCartStore";
 import { getMerchantKey, MAX_CART_MERCHANTS_MESSAGE } from "@/lib/checkout/merchant";
-import { calculateSellerCommission } from "@/lib/checkout/commission";
+import { calculateBuyerTotal, calculateMarketplaceFinancials } from "@/lib/checkout/commission";
 
 type Address = {
   region: string;
@@ -55,10 +55,14 @@ export default function CheckoutForm() {
   const [supabase] = useState(createClient);
   const items = useCartStore((state) => state.items);
   const hasHydrated = useCartStore((state) => state.hasHydrated);
-  const subtotal = useCartStore((state) => state.getTotal());
-  const sellerCommission = calculateSellerCommission(
-    items.map(({ price, quantity }) => ({ unitPrice: price, quantity })),
+  const financials = calculateMarketplaceFinancials(
+    items.map(({ price, quantity, store_id, seller_id }) => ({
+      unitPrice: price,
+      quantity,
+      merchantKey: getMerchantKey({ store_id, seller_id }) ?? undefined,
+    })),
   );
+  const subtotal = financials.salesGross;
   const [profileAddress, setProfileAddress] = useState<Address | null>(null);
   const [address, setAddress] = useState<Address>(emptyAddress);
   const [addressChoice, setAddressChoice] = useState<"saved" | "new">("new");
@@ -114,7 +118,7 @@ export default function CheckoutForm() {
   }, [router, supabase]);
 
   const shippingCost = shipping === "standard" ? 3990 : 0;
-  const total = useMemo(() => subtotal + shippingCost, [shippingCost, subtotal]);
+  const total = calculateBuyerTotal(financials, shippingCost);
   const selectedAddress = addressChoice === "saved" && profileAddress ? profileAddress : address;
   const selectedRegion = CHILE_LOCATIONS.find((location) => location.region === address.region);
   const availableCities = selectedRegion?.cities ?? [];
@@ -164,6 +168,7 @@ export default function CheckoutForm() {
         body: JSON.stringify({
           shippingAddress,
           shippingMethod: shipping,
+          expectedTotal: total,
         }),
       });
       const result = await response.json() as {
@@ -373,26 +378,37 @@ export default function CheckoutForm() {
               </CardHeader>
               <CardContent>
                 <ul className="max-h-64 space-y-4 overflow-y-auto">
-                  {items.map((item) => (
+                  {items.map((item, index) => {
+                    const lineFinancials = financials.lines[index];
+                    return (
                     <li key={item.id} className="flex gap-3">
                       <img src={item.image} alt="" className="size-14 shrink-0 rounded-lg object-cover" />
                       <div className="min-w-0 flex-1">
                         <p className="line-clamp-2 text-sm font-medium text-foreground">{item.name}</p>
                         <p className="mt-1 text-xs text-muted-foreground">Cantidad: {item.quantity}</p>
+                        {lineFinancials && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Comisión Vindex {formatProductPrice(lineFinancials.buyerVindexCommission)} · Costos operacionales {formatProductPrice(lineFinancials.buyerOperationalCost)}
+                          </p>
+                        )}
                       </div>
                       <span className="shrink-0 text-sm font-semibold text-foreground">{formatProductPrice(item.price * item.quantity)}</span>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
                 <div className="mt-5 space-y-3 border-t border-border pt-4 text-sm">
-                  <div className="flex justify-between gap-3"><span className="text-muted-foreground">Subtotal</span><span className="font-medium text-foreground">{formatProductPrice(subtotal)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-muted-foreground">Subtotal de productos</span><span className="font-medium text-foreground">{formatProductPrice(subtotal)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-muted-foreground">Comisión Vindex (2,5%)</span><span className="font-medium text-foreground">{formatProductPrice(financials.buyerVindexCommission)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-muted-foreground">Costos operacionales (1,7%)</span><span className="font-medium text-foreground">{formatProductPrice(financials.buyerOperationalCost)}</span></div>
                   <div className="flex justify-between gap-3"><span className="text-muted-foreground">Envío</span><span className="font-medium text-foreground">{formatProductPrice(shippingCost)}</span></div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-muted-foreground">Comisión Vindex (5%, vendedor)</span>
-                    <span className="font-medium text-foreground">{formatProductPrice(sellerCommission)}</span>
+                  <div className="flex justify-between gap-3 border-t border-border pt-3">
+                    <span className="font-semibold text-foreground">Total a pagar con Webpay</span>
+                    <span className="font-extrabold text-foreground">{formatProductPrice(total)}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">Se descuenta de las ganancias del vendedor y no se suma al cobro del comprador.</p>
-                  <div className="flex justify-between gap-3 border-t border-border pt-3 text-base"><span className="font-semibold text-foreground">Total</span><span className="font-extrabold text-foreground">{formatProductPrice(total)}</span></div>
+                  <p className="text-xs text-muted-foreground">
+                    El IVA de la comisión Vindex lo asume la plataforma y no se agrega a tu cobro. El 1,7% por lado es un parámetro de costos operacionales, no una tarifa universal confirmada de Transbank.
+                  </p>
                 </div>
                 <Button type="submit" className="mt-5 h-11 w-full bg-brand-600 text-white hover:bg-brand-700" disabled={submitting || !addressIsValid || exceedsMerchantLimit || pickupHasMultipleSellers}>
                   {submitting ? "Conectando con Transbank..." : "Pagar con Webpay"}

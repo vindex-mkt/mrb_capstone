@@ -39,6 +39,15 @@ const checkoutError = (message: string) => {
   if (message.includes("INVALID_CLP_AMOUNT")) {
     return { status: 400, message: "Los precios deben estar expresados en pesos chilenos enteros para pagar con Webpay." };
   }
+  if (message.includes("CHECKOUT_TOTAL_CHANGED")) {
+    return {
+      status: 409,
+      message: "El total cambió desde que abriste el checkout. Revisa los precios actualizados antes de volver a pagar.",
+    };
+  }
+  if (message.includes("INVALID_EXPECTED_TOTAL")) {
+    return { status: 400, message: "El total esperado para el pago no es válido." };
+  }
   return { status: 500, message: "No pudimos preparar el pago. Inténtalo nuevamente más tarde." };
 };
 
@@ -109,6 +118,9 @@ export async function POST(request: NextRequest) {
     || typeof body.shippingAddress !== "string"
     || typeof body.shippingMethod !== "string"
     || !["standard", "pickup"].includes(body.shippingMethod)
+    || typeof body.expectedTotal !== "number"
+    || !Number.isSafeInteger(body.expectedTotal)
+    || body.expectedTotal <= 0
     || (body.shippingMethod === "standard"
       && /coordinar con el vendedor|acordar con el vendedor|retiro en tienda/i.test(body.shippingAddress))
   ) {
@@ -169,13 +181,14 @@ export async function POST(request: NextRequest) {
     }, { status: 502 });
   }
 
-  const { data: checkoutData, error: createError } = await adminClient.rpc("create_webpay_checkout", {
+  const { data: checkoutData, error: createError } = await adminClient.rpc("create_simulated_webpay_checkout", {
     p_user_id: user.id,
     p_shipping_address: body.shippingMethod === "pickup"
       ? "Acordar con el vendedor"
       : body.shippingAddress,
     p_shipping_method: body.shippingMethod,
     p_child_commerce_codes: getTestChildCommerceCodes(),
+    p_expected_total: body.expectedTotal,
   });
   if (createError) {
     const mappedError = checkoutError(createError.message);
