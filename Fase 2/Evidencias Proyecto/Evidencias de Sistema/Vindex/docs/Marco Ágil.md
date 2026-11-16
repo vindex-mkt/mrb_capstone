@@ -49,13 +49,13 @@ Vindex es una plataforma de comercio electrónico orientada a la compra y venta 
 
 2. **Sala de Subastas Interactivas en Tiempo Real:** Un entorno dinámico para liquidar piezas exclusivas mediante pujas competitivas. En la aplicación web actual, la sala recibe cambios mediante Supabase Realtime y sincroniza el reloj con Supabase; la aceptación de ofertas y la regla _anti-sniping_ dependen de las funciones y triggers configurados en la base de datos, protegiendo el remate frente a ofertas de último segundo cuando esa configuración está activa. 
 
-3. **Módulo de Seguridad Financiera (Escrow y OTP):** El checkout actual permite simular pagos y, en caso de retiro presencial, generar un OTP de seis dígitos para validar la entrega. La retención y liberación de fondos mediante Escrow y una pasarela real siguen siendo objetivos futuros; la verificación del OTP no libera fondos actualmente. 
+3. **Módulo de Seguridad Financiera (Webpay Plus Mall, Escrow y OTP):** El checkout web inicia y confirma pagos mediante Webpay Plus Mall exclusivamente en el ambiente de integración de Transbank, sin cobros reales. Las órdenes pueden quedar autorizadas, parcialmente autorizadas o rechazadas. La custodia y liberación de fondos mediante Escrow siguen siendo objetivos futuros; la verificación del OTP de retiro presencial no libera fondos actualmente. 
 
 #### 1.5 Propuesta de Valor y Diferenciadores 
 
 Lo que busca diferenciar a Vindex no es solo la suma de sus funcionalidades, sino su enfoque en la equidad y la seguridad. La propuesta de valor es **democratizar la comercialización digital**. El rango de comisión entre el 5% y el 10% es una meta del modelo de negocio y debe validarse antes de presentarse como una tarifa vigente o como un ahorro medido. 
 
-Además, Vindex busca ofrecer una alternativa más segura a la venta informal. El modelo híbrido combina la venta directa con subastas y el checkout disponible es simulado. La validación mediante OTP está disponible para confirmar retiros presenciales, pero no implica custodia de pagos; Escrow sigue siendo una propuesta futura y no permite afirmar que actualmente exista un entorno de "Cero Riesgo" o _Trustless_. 
+Además, Vindex busca ofrecer una alternativa más segura a la venta informal. El modelo híbrido combina la venta directa con subastas y el checkout web utiliza Webpay Plus Mall en sandbox, limitado a dos comercios vendedores por compra. Esto no equivale a custodia de pagos ni a una integración productiva: Escrow sigue siendo una propuesta futura y no permite afirmar que exista un entorno de "Cero Riesgo" o _Trustless_. 
 
 #### 1.6 Visión a Futuro e Impacto 
 
@@ -85,7 +85,7 @@ La diferenciación técnica y comercial de Vindex radica en la integración de a
 
 6 
 
-- **Modelo de Confianza Cero (** **_Trustless_ ) mediante Escrow y OTP (objetivo):** La custodia del pago y la validación física asociada a su liberación son una evolución propuesta para reducir el riesgo entre usuarios. El checkout web crea órdenes con métodos de pago simulados y ofrece un OTP para confirmar retiros presenciales, pero ese código no habilita ni libera fondos. 
+- **Modelo de Confianza Cero (** **_Trustless_ ) mediante Escrow y OTP (objetivo):** La custodia del pago y la validación física asociada a su liberación son una evolución propuesta para reducir el riesgo entre usuarios. El checkout web crea órdenes y confirma subtransacciones mediante Webpay Plus Mall en sandbox; ofrece además un OTP para confirmar retiros presenciales, pero ese código no habilita ni libera fondos. 
 
 ##### **¿Qué valor agrega?** 
 
@@ -93,7 +93,7 @@ El valor agregado de la plataforma impacta tanto a nivel socioeconómico como te
 
 - **Empoderamiento y Rentabilidad:** El modelo de negocio propone un rango de comisión de 5% a 10%. Su efecto sobre la rentabilidad deberá calcularse y validarse frente a costos y tarifas vigentes antes de afirmarse como resultado. 
 
-- **Seguridad Transaccional (objetivo):** El checkout simulado ya permite confirmar el retiro presencial mediante OTP; la integración con una pasarela real y la custodia de fondos buscan completar la protección de la transacción. No debe presentarse la validación OTP actual como garantía de pago o liberación de fondos.
+- **Seguridad Transaccional (objetivo):** El checkout sandbox confirma pagos de prueba y permite confirmar el retiro presencial mediante OTP; la integración productiva y la custodia de fondos siguen pendientes. No debe presentarse la validación OTP actual como garantía de pago o liberación de fondos.
 
 - **Gamificación del Comercio Digital:** Las subastas agregan una experiencia interactiva y competitiva al catálogo. El efecto sobre la retención y la formación de precios es una hipótesis de valor que debe evaluarse con métricas de uso.
 
@@ -209,13 +209,13 @@ El siguiente Sprint Backlog organiza el alcance de Vindex en ocho iteraciones de
 
 ### Sprint 3: Carrito e Inventario 
 
-**Objetivo del Sprint:** Habilitar la compra directa mediante un carrito persistente y un checkout simulado. 
+**Objetivo original del Sprint:** Habilitar la compra directa mediante un carrito persistente y un checkout simulado. El checkout actual reemplazó esa simulación con Webpay Plus Mall en sandbox.
 
 - [US-05] Carrito con estado local persistido y sincronización con Supabase para usuarios autenticados; permite agregar, quitar y cambiar cantidades.
 
-- [US-06] Validación de cantidades respecto del stock conocido en la interfaz. El checkout actual se ejecuta mediante la RPC `process_mock_checkout`; la documentación no acredita un flujo de pagos reales ni permite afirmar que el control de stock concurrente esté cubierto de extremo a extremo.
+- [US-06] Validación de cantidades respecto del stock conocido en la interfaz. El checkout Webpay actual valida stock y precios en el servidor y reserva inventario mientras el pago está pendiente; la disponibilidad de extremo a extremo depende de aplicar la migración de Supabase.
 
-- Pantallas de checkout y confirmación, selección de dirección, envío y método de pago simulado; historial de compras y calificación de productos comprados.
+- Pantallas de checkout y resultado, selección de dirección y envío, historial de compras y calificación de productos comprados. El checkout acepta hasta dos comercios vendedores distintos y redirige a Transbank sandbox.
 
 ### Sprint 4: Base del Módulo de Subastas 
 
@@ -245,9 +245,9 @@ El siguiente Sprint Backlog organiza el alcance de Vindex en ocho iteraciones de
 
 11 
 
-- El checkout permite seleccionar Webpay Plus o Mercado Pago como métodos simulados y crea órdenes mediante `process_mock_checkout`.
+- El checkout utiliza Webpay Plus Mall en el ambiente de integración, crea la orden principal y las subtransacciones desde el servidor y confirma individualmente cada resultado. La operación simulada anterior `process_mock_checkout` no está disponible para clientes tras aplicar la migración.
 
-- [US-11] La integración real de pasarela y custodia de fondos (Escrow) continúa pendiente.
+- [US-11] El checkout Webpay Plus Mall está implementado para pruebas de integración; pagos productivos y custodia de fondos (Escrow) continúan pendientes.
 
 - [US-12 y US-13] En el retiro presencial, la RPC genera un OTP de seis dígitos y el vendedor puede validarlo desde sus órdenes; al confirmarlo, la orden pasa a `completed`. Este OTP confirma la entrega, pero no libera dinero. La configuración y las políticas de las RPC deben verificarse en Supabase.
 
@@ -263,9 +263,9 @@ El siguiente Sprint Backlog organiza el alcance de Vindex en ocho iteraciones de
 
 **Objetivo del Sprint:** Validar los flujos existentes, cerrar brechas y preparar una eventual publicación. 
 
-- Verificación manual de autenticación, catálogo, carrito, checkout simulado, mensajería y pujas; para estas últimas, comprobar RPC, RLS, triggers y Realtime en el proyecto Supabase.
+- Verificación de autenticación, catálogo, carrito, checkout Webpay sandbox, mensajería y pujas; para checkout y pujas, comprobar migración, RPC, RLS, triggers y Realtime en el proyecto Supabase. Los casos Webpay se detallan en `docs/WEBPAY_PLUS_MALL.md`.
 
-- Ejecutar las comprobaciones de lint y tipos disponibles en `apps/web`; no se encontró un script de pruebas unitarias/E2E definido para esta aplicación.
+- Ejecutar las comprobaciones de lint, tipos y pruebas unitarias de checkout disponibles en `apps/web`. Las pruebas manuales de integración con Transbank siguen requiriendo el ambiente sandbox.
 
 - Resolver defectos detectados y registrar resultados, ambiente, datos de prueba y evidencia de cada validación.
 
@@ -311,7 +311,9 @@ Para las Historias de Usuario de Carrito y Checkout (flujo actualmente implement
 
 - Criterio 2: para un usuario autenticado, el carrito debe sincronizarse con su cuenta y conservar sus artículos al recargar o volver a iniciar sesión.
 
-- Criterio 3: al confirmar el checkout, `process_mock_checkout` debe crear la orden y sus ítems a partir del carrito remoto, vaciarlo y mostrar la confirmación. La interfaz debe indicar que el método de pago es simulado.
+- Criterio 3: el checkout debe crear en el servidor la orden y sus subtransacciones a partir de datos vigentes de Supabase, y solo marcar cada parte como pagada tras confirmar su autorización con Transbank. La confirmación total, parcial o rechazada debe mostrarse sin asumir que el retorno del navegador acredita el pago. El carrito solo se limpia para los artículos efectivamente pagados.
+
+- Criterio 4: permitir como máximo dos comercios vendedores lógicos por compra, distinguiendo `store:<id>` de `seller:<id>` y liberando el cupo cuando se elimina del carrito el último artículo de un comercio.
 
 Para la Historia de Usuario de Pagos en Custodia (Escrow), pendiente de implementación:
 
@@ -374,7 +376,7 @@ El diagrama representa el flujo propuesto de custodia y validación de entrega. 
 
 ### 3.3 Diagrama de Componentes 
 
-El diagrama muestra una arquitectura objetivo. En el checkout disponible, la aplicación web está construida con Next.js y se integra directamente con Supabase (PostgreSQL, Auth, Storage y Realtime); no se acredita aquí una API NestJS, Redis ni pasarelas de pago reales. El diagrama no debe interpretarse como un inventario de componentes actualmente desplegados.
+El diagrama muestra una arquitectura objetivo. En el checkout disponible, la aplicación web está construida con Next.js, se integra con Supabase (PostgreSQL, Auth, Storage y Realtime) y se comunica con Webpay Plus Mall en sandbox desde el servidor; no se acredita aquí una API NestJS, Redis ni una pasarela productiva. El diagrama no debe interpretarse como un inventario de componentes actualmente desplegados.
 
 
 
@@ -389,13 +391,13 @@ Los siguientes atributos fijan objetivos y comprobaciones para Vindex. Se distin
 
 ### 4.1. Seguridad 
 
-Dado que Vindex maneja cuentas de usuario, órdenes y códigos de retiro, la seguridad es un requisito transversal. El checkout actual es simulado y no implementa custodia de fondos: 
+Dado que Vindex maneja cuentas de usuario, órdenes y códigos de retiro, la seguridad es un requisito transversal. El checkout actual opera únicamente con credenciales de integración de Transbank y no implementa custodia de fondos:
 
 - **Autenticación y autorización:** El registro y el inicio de sesión web utilizan Supabase Auth. El acceso a datos debe seguir las políticas RLS configuradas en Supabase. No se atribuyen Guards de NestJS a esta aplicación web.
 
 - **Protección de datos:** Las credenciales se gestionan mediante Supabase Auth y no deben almacenarse en el código ni en el repositorio. Las variables públicas requeridas por el cliente son la URL y la clave publicable de Supabase; cualquier secreto de servidor debe mantenerse fuera del cliente. Para el retiro presencial, el comprador consulta el OTP de su orden mediante `get_buyer_delivery_code` y el vendedor verifica el código mediante `verify_delivery_otp`. La autorización de estas funciones y la protección del código dependen de las RPC y políticas desplegadas en Supabase; no se afirma que el OTP esté cifrado o almacenado como hash sin evidencia de su implementación SQL.
 
-- **Pagos:** El checkout usa métodos simulados y no captura datos de tarjetas ni ejecuta una integración real de pago. Una futura pasarela deberá procesar los datos sensibles directamente en sus componentes seguros y validar sus notificaciones en servidor; ese alcance está pendiente.
+- **Pagos:** Webpay Plus Mall procesa exclusivamente transacciones de prueba en Transbank sandbox; Vindex no recibe datos de tarjetas. El servidor calcula montos, valida los resultados de cada subtransacción y restringe las operaciones de pago. Esta integración no es productiva ni implementa Escrow; las credenciales de producción no deben configurarse.
 
 ### 4.2. Rendimiento 
 
@@ -444,7 +446,7 @@ Crear `apps/web/.env.local` a partir de un archivo de ejemplo local y configurar
 - `NEXT_PUBLIC_SUPABASE_URL`: URL del proyecto Supabase.
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: clave publicable correspondiente al proyecto.
 
-No incluir claves secretas, contraseñas ni valores de producción en el repositorio. La clave publicable se utiliza desde el navegador y debe complementarse con políticas RLS correctamente configuradas en Supabase. No hay variables de una pasarela real requeridas por el checkout simulado.
+No incluir claves secretas, contraseñas ni valores de producción en el repositorio. La clave publicable se utiliza desde el navegador y debe complementarse con políticas RLS correctamente configuradas en Supabase. Para Webpay sandbox, configurar únicamente las credenciales oficiales de integración y `SUPABASE_SERVICE_ROLE_KEY` en el servidor, además de `NEXT_PUBLIC_SITE_URL`; nunca exponer secretos mediante variables `NEXT_PUBLIC_*`. Los detalles están en `docs/WEBPAY_PLUS_MALL.md`.
 
 ### 5.3. Cómo levantar el sistema localmente 
 
@@ -461,16 +463,16 @@ Para verificar calidad antes de integrar cambios, ejecutar desde `apps/web`: `np
 
 ### 6.1. Pruebas Unitarias y de Integración 
 
-En el `package.json` de `apps/web` están configurados lint, verificación de tipos y build; no se encontró un comando de pruebas unitarias o E2E. Por ello, los flujos siguientes son casos de prueba manuales que deben registrarse con fecha, ambiente, resultado y evidencia. La ausencia de un registro se considera pendiente de validación, no una prueba aprobada.
+En el `package.json` de `apps/web` están configurados lint, verificación de tipos, build y pruebas unitarias de checkout. Los escenarios que requieren Transbank/Supabase son pruebas manuales y deben registrarse con fecha, ambiente, resultado y evidencia. La ausencia de un registro se considera pendiente de validación, no una prueba aprobada.
 
 - **Autenticación:** Registrar una cuenta, iniciar y cerrar sesión y visitar una ruta protegida. Resultado esperado: la sesión se crea o termina correctamente y la ruta respeta el estado de autenticación.
 - **Catálogo y producto:** Consultar productos activos, abrir un detalle y revisar una publicación de vendedor. Resultado esperado: se presentan los datos disponibles y los errores de consulta no se confunden con un catálogo vacío.
 - **Carrito:** Agregar un producto directo, modificar su cantidad, quitarlo, recargar y probar con una cuenta autenticada. Resultado esperado: total y cantidades coherentes; el carrito autenticado se sincroniza con Supabase.
-- **Checkout simulado:** Completar el checkout con Webpay o Mercado Pago simulado. Resultado esperado: la RPC crea una orden y sus ítems desde el carrito remoto, lo vacía y muestra confirmación; el flujo no se presenta como pago real.
+- **Checkout Webpay sandbox:** Seguir los escenarios de `docs/WEBPAY_PLUS_MALL.md` con tarjetas oficiales de integración. Validar autorización total, rechazo, autorización parcial, token inválido/vencido, producto sin stock y reintento de confirmación. No usar credenciales de producción ni considerar el retorno del navegador como pago confirmado.
 - **Mensajería:** Iniciar una conversación, enviar un mensaje y abrirla desde otra sesión autorizada. Resultado esperado: historial y mensajes nuevos visibles conforme a las políticas RLS y Realtime.
 - **Subasta:** Publicar una subasta, probar valores inválidos, registrar una puja y observar otra sesión. Resultado esperado: la interfaz valida el rango, la RPC es la vía de envío y la sala refleja los cambios de Realtime; RLS y triggers se verifican directamente en Supabase.
 - **Retiro presencial con OTP:** Completar una compra con retiro en tienda, consultar el código desde la cuenta compradora, ingresar el código desde la cuenta vendedora y verificar que la orden pase de `pending_pickup` a `completed`. Probar además un código incorrecto y el acceso a una orden ajena; la configuración de las RPC y políticas debe confirmarse en Supabase.
-- **Custodia de pagos:** No aplicable a la versión web actual. Mantener pendiente hasta implementar y probar una pasarela real, custodia y liberación de fondos.
+- **Custodia de pagos:** No aplicable a la versión web actual. Mantener pendiente hasta implementar y probar custodia y liberación de fondos; Webpay sandbox no proporciona esa funcionalidad por sí solo.
 
 Después de cualquier cambio de esquema, repetir los flujos afectados contra un entorno de prueba de Supabase y registrar qué migraciones, RPC, triggers y políticas se utilizaron.
 
