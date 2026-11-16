@@ -6,8 +6,6 @@ import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/sup
 export const runtime = "nodejs";
 
 const pageSize = 1000;
-const historyLimit = 100;
-
 type PageResult<T> = {
   data: T[] | null;
   error: { message: string } | null;
@@ -53,6 +51,14 @@ function toAmount(value: number | string) {
     throw new Error("La base de datos devolvió un monto financiero fuera de rango.");
   }
   return amount;
+}
+
+function addAmounts(left: number, right: number) {
+  const total = left + right;
+  if (!Number.isSafeInteger(total) || total < 0) {
+    throw new Error("El total financiero excede el monto CLP seguro.");
+  }
+  return total;
 }
 
 function getPeriod(value: string | null): FinancePeriod | null {
@@ -148,7 +154,7 @@ export async function GET(request: NextRequest) {
       .filter(({ status }) => status === "collected")
       .reduce((total, row) => total + toAmount(row.commission_amount), 0);
     const promotionIncome = authorizedPromotions
-      .reduce((total, row) => total + toAmount(row.amount), 0);
+      .reduce((total, row) => addAmounts(total, toAmount(row.amount)), 0);
     const accruedFinancials = calculateMarketplaceFinancials(
       generatedCommissions
         .filter(({ status }) => status !== "reversed")
@@ -201,11 +207,15 @@ export async function GET(request: NextRequest) {
     const promotionRows = new Map<string, PromotionRow>();
     for (const row of [...createdPromotions, ...authorizedPromotions]) promotionRows.set(row.id, row);
     for (const row of promotionRows.values()) {
+      const authorizedAt = row.authorized_at;
+      const authorizedInPeriod = authorizedAt !== null
+        && authorizedAt >= range.start
+        && authorizedAt < range.end;
       historyByKey.set(`promotion-${row.id}`, {
         id: `promotion-${row.id}`,
         type: "promotion",
-        date: row.authorized_at ?? row.created_at,
-        description: row.status === "authorized" ? "Promoción pagada" : "Pago de promoción",
+        date: authorizedInPeriod ? authorizedAt : row.created_at,
+        description: authorizedInPeriod ? "Promoción pagada" : "Pago de promoción",
         reference: `Producto #${row.product_id} · ${row.duration_days} días`,
         baseAmount: null,
         amount: toAmount(row.amount),
@@ -214,8 +224,7 @@ export async function GET(request: NextRequest) {
     }
 
     const history = [...historyByKey.values()]
-      .sort((left, right) => right.date.localeCompare(left.date))
-      .slice(0, historyLimit);
+      .sort((left, right) => right.date.localeCompare(left.date));
 
     return NextResponse.json({
       period,
@@ -234,13 +243,14 @@ export async function GET(request: NextRequest) {
         buyerOperationalCost: accruedFinancials.buyerOperationalCost,
         vindexVatAssumedEstimate: accruedFinancials.vindexVatEstimate,
         vindexNetAfterVatEstimate: accruedFinancials.vindexNetAfterVatEstimate,
+        vindexNetAfterVatPlusAdvertisingEstimate:
+          addAmounts(accruedFinancials.vindexNetAfterVatEstimate, promotionIncome),
         sellerNetEstimate: accruedFinancials.sellerNetEstimate,
         vindexCommissionCollectedNetAfterVatEstimate: collectedFinancials.vindexNetAfterVatEstimate,
         promotionsAuthorizedInSandbox: promotionIncome,
-        totalRecordedIncome: commissionsCollectedTotal + promotionIncome,
+        totalRecordedIncome: addAmounts(commissionsCollectedTotal, promotionIncome),
       },
       history,
-      historyLimit,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error desconocido.";

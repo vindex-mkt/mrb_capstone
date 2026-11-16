@@ -1,10 +1,29 @@
 import { NextResponse } from "next/server";
+import { getFinancePeriodRange } from "@/lib/admin/finance-period";
+import { calculateMarketplaceFinancials } from "@/lib/checkout/commission";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 const paidOrderStatuses = ["paid", "completed", "delivered"];
 const pageSize = 1000;
+
+type CommissionRow = {
+  base_amount: number | string;
+  status: "pending_settlement" | "collected" | "reversed";
+};
+
+type PromotionRow = {
+  amount: number | string;
+};
+
+function addFinancialAmounts(left: number, right: number) {
+  const total = left + right;
+  if (!Number.isSafeInteger(total) || total < 0) {
+    throw new Error("El total financiero excede el monto CLP seguro.");
+  }
+  return total;
+}
 
 export async function GET() {
   const authClient = await createSupabaseServerClient();
@@ -91,6 +110,55 @@ export async function GET() {
       console.error(`No se pudo consultar la métrica ${label}:`, result.status, result.statusText, result.error.message || "Error sin detalles.");
     });
 
+    let netProfitEstimate: number | null = null;
+    try {
+      const range = getFinancePeriodRange("month", now);
+      const commissionRows: CommissionRow[] = [];
+      const promotionRows: PromotionRow[] = [];
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await adminClient.from("order_commissions")
+          .select("base_amount, status")
+          .gte("created_at", range.start)
+          .lt("created_at", range.end)
+          .order("created_at", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw new Error(error.message);
+        commissionRows.push(...data);
+        if (data.length < pageSize) break;
+      }
+
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await adminClient.from("product_ad_transactions")
+          .select("amount")
+          .eq("status", "authorized")
+          .gte("authorized_at", range.start)
+          .lt("authorized_at", range.end)
+          .order("authorized_at", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw new Error(error.message);
+        promotionRows.push(...data);
+        if (data.length < pageSize) break;
+      }
+
+      const commissionNetAfterVat = calculateMarketplaceFinancials(
+        commissionRows
+          .filter(({ status }) => status !== "reversed")
+          .map(({ base_amount }) => ({ unitPrice: Number(base_amount), quantity: 1 })),
+      ).vindexNetAfterVatEstimate;
+      const promotionIncome = promotionRows.reduce((total, row) => {
+        const amount = Number(row.amount);
+        if (!Number.isSafeInteger(amount) || amount < 0) {
+          throw new Error("La base de datos devolvió un monto publicitario fuera de rango.");
+        }
+        return addFinancialAmounts(total, amount);
+      }, 0);
+      netProfitEstimate = addFinancialAmounts(commissionNetAfterVat, promotionIncome);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Error desconocido.";
+      unavailableMetrics.push("utilidad neta estimada");
+      console.error("No se pudo calcular la utilidad neta estimada:", detail);
+    }
+
     const salesRows: Array<{ created_at: string; subtotal: number | string; buyer_id: string }> = [];
     for (let offset = 0; ; offset += pageSize) {
       const { data, error } = await adminClient
@@ -135,6 +203,7 @@ export async function GET() {
     return NextResponse.json({
       generatedAt: now.toISOString(),
       unavailableMetrics,
+      netProfitEstimate,
       productsPublished: count(0),
       productsPending: count(1),
       activeOffers: count(2),

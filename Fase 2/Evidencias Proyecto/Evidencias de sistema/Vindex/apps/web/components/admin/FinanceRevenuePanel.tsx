@@ -31,13 +31,13 @@ type FinanceResponse = {
     buyerOperationalCost: number;
     vindexVatAssumedEstimate: number;
     vindexNetAfterVatEstimate: number;
+    vindexNetAfterVatPlusAdvertisingEstimate: number;
     sellerNetEstimate: number;
     vindexCommissionCollectedNetAfterVatEstimate: number;
     promotionsAuthorizedInSandbox: number;
     totalRecordedIncome: number;
   };
   history: FinanceHistoryItem[];
-  historyLimit: number;
 };
 
 const currencyFormatter = new Intl.NumberFormat("es-CL", {
@@ -49,6 +49,7 @@ const currencyFormatter = new Intl.NumberFormat("es-CL", {
 const dateFormatter = new Intl.DateTimeFormat("es-CL", {
   dateStyle: "short",
   timeStyle: "short",
+  timeZone: "America/Santiago",
 });
 
 function isFinanceResponse(value: unknown): value is FinanceResponse {
@@ -68,6 +69,7 @@ function isFinanceResponse(value: unknown): value is FinanceResponse {
     summary?.buyerOperationalCost,
     summary?.vindexVatAssumedEstimate,
     summary?.vindexNetAfterVatEstimate,
+    summary?.vindexNetAfterVatPlusAdvertisingEstimate,
     summary?.sellerNetEstimate,
     summary?.vindexCommissionCollectedNetAfterVatEstimate,
     summary?.promotionsAuthorizedInSandbox,
@@ -87,8 +89,7 @@ function isFinanceResponse(value: unknown): value is FinanceResponse {
       && (item.baseAmount === null || typeof item.baseAmount === "number")
       && typeof item.amount === "number"
       && typeof item.status === "string",
-    )
-    && typeof result.historyLimit === "number";
+    );
 }
 
 function statusLabel(status: string) {
@@ -123,6 +124,7 @@ export default function FinanceRevenuePanel() {
   const [data, setData] = useState<FinanceResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
   useEffect(() => {
     let current = true;
@@ -170,7 +172,10 @@ export default function FinanceRevenuePanel() {
             aria-label="Período de ingresos"
             className="min-h-10 rounded-lg border border-border bg-surface px-3 text-sm text-foreground"
             value={period}
-            onChange={(event) => setPeriod(event.target.value as Period)}
+            onChange={(event) => {
+              setPeriod(event.target.value as Period);
+              setShowAllHistory(false);
+            }}
           >
             <option value="day">Día actual</option>
             <option value="month">Mes actual</option>
@@ -188,104 +193,89 @@ export default function FinanceRevenuePanel() {
 
       {data && !loading && !error && (
         <>
-          <p className="text-xs text-muted-foreground">{data.periodLabel} · montos en CLP</p>
-          <h3 className="text-sm font-semibold text-foreground">Modelo financiero estimado sobre ventas confirmadas</h3>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <SummaryCard
               title="Ventas brutas"
               amount={data.summary.salesGross}
-              detail="Precio original de productos, sin envío"
+              detail=""
             />
             <SummaryCard
               title="Comisión Vindex bruta"
               amount={data.summary.vindexCommissionAccruedGross}
-              detail="5% devengado sobre ventas brutas"
+              detail=""
             />
             <SummaryCard
-              title="Parte vendedor · Vindex"
-              amount={data.summary.sellerVindexCommissionEstimate}
-              detail="50% de la comisión Vindex"
-            />
-            <SummaryCard
-              title="Parte comprador · Vindex"
-              amount={data.summary.buyerVindexCommissionEstimate}
-              detail="50% de la comisión Vindex"
+              title="Comisión Vindex · distribución 50/50"
+              amount={data.summary.vindexCommissionAccruedGross}
+              detail={`Comprador ${currencyFormatter.format(data.summary.buyerVindexCommissionEstimate)} · Vendedor ${currencyFormatter.format(data.summary.sellerVindexCommissionEstimate)}`}
             />
             <SummaryCard
               title="Costos operacionales"
               amount={data.summary.operationalCostsGross}
-              detail="1,7% por cada lado de la operación"
-            />
-            <SummaryCard
-              title="Costos operacionales · vendedor"
-              amount={data.summary.sellerOperationalCost}
-              detail="1,7% del precio original"
-            />
-            <SummaryCard
-              title="Costos operacionales · comprador"
-              amount={data.summary.buyerOperationalCost}
-              detail="1,7% del precio original"
+              detail={`Vendedor ${currencyFormatter.format(data.summary.sellerOperationalCost)} · Comprador ${currencyFormatter.format(data.summary.buyerOperationalCost)} (1,7% por lado)`}
             />
             <SummaryCard
               title="IVA asumido por Vindex"
               amount={data.summary.vindexVatAssumedEstimate}
-              detail="19% de la comisión bruta; no se cobra al comprador ni al vendedor"
+              detail="19% de la comisión"
             />
             <SummaryCard
-              title="Ingreso Vindex después del IVA"
-              amount={data.summary.vindexNetAfterVatEstimate}
-              detail="Estimación devengada; no implica que se haya recaudado"
+              title="Utilidad neta estimada"
+              amount={data.summary.vindexNetAfterVatPlusAdvertisingEstimate}
+              detail="Comisión después del IVA + publicidad"
             />
             <SummaryCard
               title="Neto estimado vendedores"
               amount={data.summary.sellerNetEstimate}
-              detail="Ventas menos las participaciones del vendedor; sin envío"
+              detail=""
             />
           </div>
 
-          <h3 className="text-sm font-semibold text-foreground">Estado real del ledger</h3>
+          <h3 className="text-sm font-semibold text-foreground">Resumen de movimientos</h3>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <SummaryCard
-              title="Comisiones devengadas"
+              title="Comisiones reservadas"
               amount={data.summary.commissionsGenerated}
-              detail="Registradas en el ledger; no significa dinero recibido"
+              detail=""
             />
             <SummaryCard
               title="Comisiones cobradas"
               amount={data.summary.commissionsCollected}
-              detail="Solo filas con estado collected"
+              detail=""
             />
             <SummaryCard
               title="Pendientes de liquidación"
               amount={data.summary.commissionsPending}
-              detail="Devengadas, todavía no cobradas"
+              detail=""
             />
             <SummaryCard
               title="Neto estimado de comisiones cobradas"
               amount={data.summary.vindexCommissionCollectedNetAfterVatEstimate}
-              detail="Comisión cobrada menos el IVA estimado de Vindex"
+              detail=""
             />
             <SummaryCard
               title="Promociones pagadas"
               amount={data.summary.promotionsAuthorizedInSandbox}
-              detail="Autorizaciones de Webpay en sandbox"
+              detail=""
             />
             <SummaryCard
               title="Ingresos Vindex registrados"
               amount={data.summary.totalRecordedIncome}
-              detail="Comisiones cobradas + promociones autorizadas en sandbox"
+              detail=""
             />
           </div>
-
+          {/* 
           <p className="rounded-xl bg-brand-50 p-4 text-xs leading-5 text-brand-800">
             Las participaciones del comprador y del vendedor, y los costos operacionales, son estimaciones derivadas de las ventas confirmadas.
             No representan cobros ni liquidaciones. La RPC actual de Webpay Plus Mall mantiene sus montos y debe actualizarse en Supabase
-            antes de recaudar las nuevas participaciones. Las promociones autorizadas son transacciones sandbox y no equivalen a dinero real recibido.
+            antes de recaudar las nuevas participaciones. La utilidad neta estimada suma la comisión de Vindex después del IVA y los montos de publicidad autorizados;
+            la publicidad se suma en monto bruto, sin cálculo separado de IVA, y sigue en sandbox: no equivale a dinero real recibido. Tampoco es un resultado contable
+            ni descuenta costos operacionales reales.
           </p>
-
-          <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-card">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="border-b border-border bg-brand-50/60 text-xs uppercase tracking-wide text-muted-foreground">
+          */}
+          <div className="max-h-[28rem] overflow-auto rounded-2xl border border-border bg-surface shadow-card">
+            <table id="finance-history" className="w-full min-w-[760px] text-left text-sm">
+              <thead className="sticky top-0 z-10 border-b border-border bg-brand-50 text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th scope="col" className="px-4 py-3">Fecha</th>
                   <th scope="col" className="px-4 py-3">Movimiento</th>
@@ -296,7 +286,7 @@ export default function FinanceRevenuePanel() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {data.history.map((entry) => (
+                {(showAllHistory ? data.history : data.history.slice(0, 4)).map((entry) => (
                   <tr key={entry.id}>
                     <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                       {dateFormatter.format(new Date(entry.date))}
@@ -321,12 +311,25 @@ export default function FinanceRevenuePanel() {
                 )}
               </tbody>
             </table>
-            {data.history.length >= data.historyLimit && (
-              <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
-                Mostrando los {data.historyLimit} movimientos más recientes del período.
-              </p>
-            )}
           </div>
+          {data.history.length > 4 && (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">
+                {showAllHistory
+                  ? `Mostrando ${data.history.length} movimientos del período.`
+                  : `Mostrando los 4 movimientos más recientes de ${data.history.length}.`}
+              </p>
+              <button
+                type="button"
+                aria-controls="finance-history"
+                aria-expanded={showAllHistory}
+                className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-brand-700 transition hover:border-brand-300 hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                onClick={() => setShowAllHistory((current) => !current)}
+              >
+                {showAllHistory ? "Mostrar solo los 4 más recientes" : "Ver todos"}
+              </button>
+            </div>
+          )}
         </>
       )}
     </section>

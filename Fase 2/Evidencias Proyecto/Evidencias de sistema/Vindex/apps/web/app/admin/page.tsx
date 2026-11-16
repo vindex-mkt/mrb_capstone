@@ -20,6 +20,7 @@ import FinanceRevenuePanel from "@/components/admin/FinanceRevenuePanel";
 type DashboardStats = {
   generatedAt: string;
   unavailableMetrics: string[];
+  netProfitEstimate: number | null;
   productsPublished: number | null;
   productsPending: number | null;
   activeOffers: number | null;
@@ -74,6 +75,10 @@ function isDashboardStats(value: unknown): value is DashboardStats {
   return typeof stats.generatedAt === "string"
     && Array.isArray(stats.unavailableMetrics)
     && stats.unavailableMetrics.every((metric) => typeof metric === "string")
+    && (stats.netProfitEstimate === null
+      || (typeof stats.netProfitEstimate === "number"
+        && Number.isSafeInteger(stats.netProfitEstimate)
+        && stats.netProfitEstimate >= 0))
     && numericFields.every((field) => typeof stats[field] === "number" || stats[field] === null)
     && Array.isArray(stats.salesByMonth)
     && stats.salesByMonth.every((month) =>
@@ -228,13 +233,13 @@ export default function AdminDashboardPage() {
     icon: React.ComponentType<IconProps>;
     href?: string;
   }> = [
-    { title: "Usuarios", value: stats.users, detail: "Perfiles registrados", icon: IconUser },
-    { title: "Tiendas", value: stats.stores, detail: "Tiendas creadas", icon: IconStore },
-    { title: "Subastas activas", value: stats.activeAuctions, detail: "Publicadas y vigentes", icon: IconBolt },
-    { title: "Pujas en subastas", value: stats.bids, detail: "Ofertas recibidas en subastas", icon: IconTag },
-    { title: "Pendientes de moderación", value: stats.productsPending, detail: "Requieren revisión", icon: IconShieldCheck, href: "/admin/moderation" },
-    { title: "Favoritos", value: stats.favorites, detail: "Productos guardados", icon: IconHeart },
-    { title: "Reseñas", value: stats.reviews, detail: "Opiniones de compradores", icon: IconStar },
+    { title: "Usuarios", value: stats.users, detail: "", icon: IconUser },
+    { title: "Tiendas", value: stats.stores, detail: "", icon: IconStore },
+    { title: "Subastas activas", value: stats.activeAuctions, detail: "", icon: IconBolt },
+    { title: "Pujas en subastas", value: stats.bids, detail: "", icon: IconTag },
+    { title: "Pendientes de moderación", value: stats.productsPending, detail: "", icon: IconShieldCheck, href: "/admin/moderation" },
+    { title: "Favoritos", value: stats.favorites, detail: "", icon: IconHeart },
+    { title: "Reseñas", value: stats.reviews, detail: "", icon: IconStar },
     {
       title: "Conversaciones",
       value: stats.conversations,
@@ -264,7 +269,7 @@ export default function AdminDashboardPage() {
         <MetricCard
           title="Productos publicados"
           value={formatCount(stats.productsPublished)}
-          detail={`${formatCount(stats.productsPending)} pendientes de moderación`}
+          detail={``}
           icon={IconTag}
         />
         <MetricCard
@@ -274,21 +279,21 @@ export default function AdminDashboardPage() {
           icon={IconWallet}
         />
         <MetricCard
-          title="Utilidad neta"
-          value="No disponible"
-          detail="Faltan costos operativos y liquidaciones efectivas"
+          title="Utilidad neta estimada"
+          value={stats.netProfitEstimate === null ? "No disponible" : currencyFormatter.format(stats.netProfitEstimate)}
+          detail={""}
           icon={IconWallet}
         />
         <MetricCard
           title="Pedidos pagados"
           value={formatCount(stats.completedOrders)}
-          detail="Acumulado histórico"
+          detail=""
           icon={IconCart}
         />
         <MetricCard
           title="Ofertas activas"
           value={formatCount(stats.activeOffers)}
-          detail="Descuentos vigentes en productos publicados"
+          detail=""
           icon={IconBolt}
         />
       </section>
@@ -323,9 +328,6 @@ export default function AdminDashboardPage() {
               <dd className="font-semibold text-foreground">{formatCount(stats.pendingDeliveries)}</dd>
             </div>
           </dl>
-          <p className="mt-5 rounded-xl bg-brand-50 p-3 text-xs leading-5 text-brand-800">
-            Las ventas brutas suman subtotales de pedidos pagados y no descuentan costos ni comisión. La utilidad neta no puede calcularse con los datos actuales.
-          </p>
         </article>
       </section>
 
