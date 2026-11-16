@@ -36,10 +36,14 @@ export default async function FeaturedProducts() {
               key={product.id}
               id={product.id}
               name={product.name ?? "Producto sin nombre"}
-              price={formatProductPrice(getActiveDiscountPrice(product) ?? product.price)}
+              price={formatProductPrice(product.sale_type === "auction"
+                ? product.current_bid ?? product.starting_price ?? null
+                : getActiveDiscountPrice(product) ?? product.price)}
               image={getProductImage(product)}
               previousPrice={getActiveDiscountPrice(product) !== null ? formatProductPrice(product.price) : undefined}
               discount={getDiscountLabel(product)}
+              saleType={product.sale_type}
+              currentBid={product.current_bid}
             />
           ))}
         </div>

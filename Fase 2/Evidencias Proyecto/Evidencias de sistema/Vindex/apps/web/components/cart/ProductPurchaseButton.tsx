@@ -111,7 +111,7 @@ export default function ProductPurchaseButton({ product, currentPrice, action = 
       type="button"
       disabled={!canAdd || buying}
       onClick={() => void handlePurchase()}
-      className={`btn ${action === "buy" ? "btn-light" : "btn-primary"} flex-1 min-w-45 disabled:cursor-not-allowed disabled:opacity-50`}
+      className="btn btn-primary h-full min-h-11 w-full justify-center px-2 py-2 text-center leading-tight whitespace-normal disabled:cursor-not-allowed disabled:opacity-50"
     >
       {action === "buy"
         ? <CreditCard className="size-4" aria-hidden="true" />

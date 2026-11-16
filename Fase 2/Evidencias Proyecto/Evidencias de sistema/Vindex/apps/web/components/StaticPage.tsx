@@ -14,6 +14,7 @@ export default function StaticPage({
 	description,
 	sections,
 	isDraft = false,
+	updatedAt = "26 de octubre de 2026",
 }: StaticPageProps) {
 	return (
 		<main className="min-h-screen bg-background">
@@ -28,15 +29,8 @@ export default function StaticPage({
 							{description}
 						</p>
 						<p className="mt-4 text-sm text-brand-200">
-							Actualizado el 26 de octubre de 2026
+							Actualizado el {updatedAt}
 						</p>
-						{isDraft && (
-							<p className="mt-5 rounded-xl border border-brand-300/40 bg-brand-900/60 p-4 text-sm leading-6 text-white">
-								Borrador para un proyecto universitario: este contenido es
-								referencial y debe ser revisado por el equipo antes de
-								publicarse como política oficial.
-							</p>
-						)}
 					</div>
 				</div>
 			</section>

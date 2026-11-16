@@ -92,9 +92,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                <ProductPurchaseButton product={product} currentPrice={activePrice} />
+              <div className="grid grid-cols-2 gap-3">
                 <ProductPurchaseButton product={product} currentPrice={activePrice} action="buy" />
+                <ProductPurchaseButton product={product} currentPrice={activePrice} />
                 <MessageSellerButton
                   productId={product.id}
                   sellerId={product.seller_id}

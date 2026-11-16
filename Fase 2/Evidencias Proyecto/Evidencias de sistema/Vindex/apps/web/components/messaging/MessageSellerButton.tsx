@@ -111,7 +111,8 @@ export default function MessageSellerButton({
     <Button
       type="button"
       size="lg"
-      className="min-h-11 flex-1 bg-brand-600 text-white hover:bg-brand-700"
+      variant="outline"
+      className="h-auto min-h-11 w-full justify-center border-border bg-surface px-2 py-2 text-center leading-tight whitespace-normal text-foreground hover:border-brand-300 hover:bg-surface hover:text-brand-700"
       onClick={() => void openConversation()}
       disabled={isLoading}
     >

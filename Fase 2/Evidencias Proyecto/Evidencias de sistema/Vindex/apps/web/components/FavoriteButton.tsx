@@ -42,7 +42,7 @@ export default function FavoriteButton({
 
   const visualClass = variant === "icon"
     ? `absolute right-3 top-3 z-10 flex size-9 items-center justify-center rounded-full border border-border bg-surface/95 text-foreground shadow-sm backdrop-blur transition hover:border-accent-600 hover:text-accent-600 focus-visible:opacity-100 disabled:cursor-wait ${active ? "opacity-100" : "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"}`
-    : "btn btn-outline min-h-11 flex-1 px-4";
+    : "btn btn-outline col-start-2 h-full min-h-11 w-full justify-center px-2 py-2 text-center leading-tight whitespace-normal";
 
   return (
     <button
