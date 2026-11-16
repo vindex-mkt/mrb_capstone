@@ -36,7 +36,7 @@ export default function WalletNavButton() {
     >
       <button
         type="button"
-        className="icon-btn h-10 w-10"
+        className="icon-btn h-9 w-9 sm:h-10 sm:w-10"
         aria-label="Abrir billetera Vindex"
         aria-expanded={open}
         aria-controls="wallet-nav-panel"
@@ -53,7 +53,7 @@ export default function WalletNavButton() {
           <div>
             <p className="text-sm font-bold text-foreground">Billetera Vindex</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {userId ? "Tu saldo disponible" : "Inicia sesión para ver tu saldo"}
+              {userId ? "Saldo virtual disponible · integración" : "Inicia sesión para ver tu saldo"}
             </p>
           </div>
           <IconWallet className="h-5 w-5 shrink-0 text-brand-700" />

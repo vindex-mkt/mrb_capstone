@@ -36,6 +36,14 @@ export const createAdvertisingTransaction = () => {
 };
 
 export const createMallTransaction = () => {
+  assertIntegrationMallCredentials();
+  const mallCommerceCode = process.env.TRANSBANK_COMMERCE_CODE!;
+  const apiKey = process.env.TRANSBANK_API_KEY!;
+
+  return WebpayPlus.MallTransaction.buildForIntegration(mallCommerceCode, apiKey);
+};
+
+export const assertIntegrationMallCredentials = () => {
   const environment = process.env.TRANSBANK_ENV?.trim().toLowerCase();
   const apiKey = process.env.TRANSBANK_API_KEY;
   const mallCommerceCode = process.env.TRANSBANK_COMMERCE_CODE;
@@ -51,8 +59,6 @@ export const createMallTransaction = () => {
   ) {
     throw new Error("La configuración de Webpay debe usar exclusivamente las credenciales de integración de Transbank.");
   }
-
-  return WebpayPlus.MallTransaction.buildForIntegration(mallCommerceCode, apiKey);
 };
 
 export const getTestChildCommerceCodes = () => [

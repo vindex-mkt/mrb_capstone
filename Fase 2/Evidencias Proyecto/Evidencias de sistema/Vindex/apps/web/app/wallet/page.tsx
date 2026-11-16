@@ -67,7 +67,7 @@ export default function WalletPage() {
                 Mi billetera
               </h1>
               <p className="mt-2 max-w-xl text-sm leading-6 text-brand-100 sm:text-base">
-                Administra tus créditos y revisa las garantías reservadas para tus subastas.
+                Consulta tus saldos simulados, garantías y entregas en custodia. No representan dinero real ni permiten retiros.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -111,11 +111,11 @@ export default function WalletPage() {
               <article className="card p-5 sm:p-7">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-semibold text-muted-foreground">Saldo disponible</p>
+                    <p className="text-sm font-semibold text-muted-foreground">Saldo virtual disponible</p>
                     <p className="mt-3 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
                       {loading ? "Cargando..." : error ? "No disponible" : balances ? formatCLP(balances.available) : "—"}
                     </p>
-                    <p className="mt-2 text-sm text-muted-foreground">Listo para utilizar o retirar</p>
+                    <p className="mt-2 text-sm text-muted-foreground">Simulación de integración; no retirable</p>
                   </div>
                   <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-700">
                     <IconWallet className="h-6 w-6" />
@@ -135,6 +135,23 @@ export default function WalletPage() {
                     <LockKeyhole className="h-6 w-6" aria-hidden="true" />
                   </span>
                 </div>
+              </article>
+              <article className="card border-amber-200 bg-amber-50/70 p-5 sm:p-7">
+                <p className="text-sm font-semibold text-muted-foreground">Compras en custodia</p>
+                <p className="mt-3 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+                  {loading ? "Cargando..." : error ? "No disponible" : balances ? formatCLP(balances.buyerEscrow) : "—"}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Custodia virtual; el OTP valida la entrega coordinada.</p>
+              </article>
+              <article
+                className="card border-amber-200 bg-amber-50/70 p-5 sm:p-7"
+                title="Fondos retenidos por ventas"
+              >
+                <p className="text-sm font-semibold text-muted-foreground">Ventas retenidas</p>
+                <p className="mt-3 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+                  {loading ? "Cargando..." : error ? "No disponible" : balances ? formatCLP(balances.sellerEscrow) : "—"}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">Neto virtual; se acredita al confirmar la entrega.</p>
               </article>
             </section>
 

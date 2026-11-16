@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateMallCommitResponse } from "./payment-validation.ts";
+import {
+  classifyMallTransactionStatus,
+  validateMallCommitResponse,
+} from "./payment-validation.ts";
 
 const firstExpected = {
   amount: 10000,
@@ -79,4 +82,34 @@ test("flags missing or unexpected subtransactions instead of treating the paymen
 
   assert.equal(missing.results[1]?.verification_error, true);
   assert.equal(unexpected.results.every((detail) => detail.verification_error), true);
+});
+
+test("classifies only verified, terminal Mall status responses as retryable", () => {
+  const authorized = validateMallCommitResponse(expected, {
+    buy_order: expected.mallBuyOrder,
+    details: [child(firstExpected), child(secondExpected)],
+  });
+  const declined = validateMallCommitResponse(expected, {
+    buy_order: expected.mallBuyOrder,
+    details: [
+      child(firstExpected, { status: "FAILED", response_code: -1 }),
+      child(secondExpected, { status: "REJECTED", response_code: 5 }),
+    ],
+  });
+  const initialized = validateMallCommitResponse(expected, {
+    buy_order: expected.mallBuyOrder,
+    details: [
+      child(firstExpected, { status: "INITIALIZED", response_code: null }),
+      child(secondExpected, { status: "INITIALIZED", response_code: null }),
+    ],
+  });
+  const mismatched = validateMallCommitResponse(expected, {
+    buy_order: "another-order",
+    details: [child(firstExpected), child(secondExpected)],
+  });
+
+  assert.equal(classifyMallTransactionStatus(authorized.results), "authorized");
+  assert.equal(classifyMallTransactionStatus(declined.results), "rejected");
+  assert.equal(classifyMallTransactionStatus(initialized.results), "not_authorized");
+  assert.equal(classifyMallTransactionStatus(mismatched.results), "unresolved");
 });

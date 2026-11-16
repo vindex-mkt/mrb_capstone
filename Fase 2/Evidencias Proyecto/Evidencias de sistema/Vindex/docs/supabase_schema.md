@@ -1,5 +1,3 @@
--- WARNING: This schema is for context only and is not meant to be run.
--- Table order and constraints may not be valid for execution.
 
 CREATE TABLE public.products (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -30,8 +28,13 @@ CREATE TABLE public.products (
   winner_id uuid,
   store_category_id bigint,
   category_id uuid,
+  moderation_status text NOT NULL DEFAULT 'pending_review'::text CHECK (moderation_status = ANY (ARRAY['pending_review'::text, 'approved'::text, 'rejected'::text, 'flagged'::text])),
+  moderation_reason text,
+  moderated_at timestamp with time zone,
+  moderated_by uuid,
   CONSTRAINT products_pkey PRIMARY KEY (id),
   CONSTRAINT fk_products_profiles FOREIGN KEY (seller_id) REFERENCES public.profiles(id),
+  CONSTRAINT products_moderated_by_fkey FOREIGN KEY (moderated_by) REFERENCES public.profiles(id),
   CONSTRAINT products_store_category_id_fkey FOREIGN KEY (store_category_id) REFERENCES public.store_categories(id),
   CONSTRAINT products_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES auth.users(id),
   CONSTRAINT products_winner_id_fkey FOREIGN KEY (winner_id) REFERENCES auth.users(id),
@@ -168,6 +171,7 @@ CREATE TABLE public.orders (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   delivery_code text,
   delivery_status text NOT NULL DEFAULT 'pending_pickup'::text,
+  shipping_method text NOT NULL DEFAULT 'standard'::text CHECK (shipping_method = ANY (ARRAY['standard'::text, 'pickup'::text])),
   CONSTRAINT orders_pkey PRIMARY KEY (id),
   CONSTRAINT orders_buyer_id_fkey FOREIGN KEY (buyer_id) REFERENCES public.profiles(id)
 );
@@ -205,4 +209,161 @@ CREATE TABLE public.auction_guarantees (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT auction_guarantees_pkey PRIMARY KEY (id),
   CONSTRAINT auction_guarantees_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.payment_transactions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  order_id bigint NOT NULL UNIQUE,
+  mall_buy_order text NOT NULL UNIQUE,
+  transbank_token text UNIQUE,
+  total_amount bigint NOT NULL CHECK (total_amount > 0),
+  status text NOT NULL CHECK (status = ANY (ARRAY['created'::text, 'initiated'::text, 'processing'::text, 'authorized'::text, 'partially_authorized'::text, 'rejected'::text, 'cancelled'::text, 'payment_review'::text, 'communication_error'::text])),
+  response jsonb,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  committed_at timestamp with time zone,
+  CONSTRAINT payment_transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT payment_transactions_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id)
+);
+CREATE TABLE public.payment_subtransactions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  payment_transaction_id uuid NOT NULL,
+  commerce_key text NOT NULL,
+  commerce_code text NOT NULL,
+  child_buy_order text NOT NULL UNIQUE,
+  seller_id uuid NOT NULL,
+  store_id bigint,
+  amount bigint NOT NULL CHECK (amount > 0),
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'authorized'::text, 'rejected'::text, 'cancelled'::text, 'verification_error'::text, 'communication_error'::text])),
+  response_code integer,
+  authorization_code text,
+  authorized_at timestamp with time zone,
+  response jsonb,
+  inventory_processed boolean NOT NULL DEFAULT false,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT payment_subtransactions_pkey PRIMARY KEY (id),
+  CONSTRAINT payment_subtransactions_payment_transaction_id_fkey FOREIGN KEY (payment_transaction_id) REFERENCES public.payment_transactions(id),
+  CONSTRAINT payment_subtransactions_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES public.profiles(id),
+  CONSTRAINT payment_subtransactions_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id)
+);
+CREATE TABLE public.product_ad_transactions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  product_id bigint NOT NULL,
+  seller_id uuid NOT NULL,
+  buy_order text NOT NULL UNIQUE,
+  transbank_token text UNIQUE,
+  duration_days integer NOT NULL,
+  amount bigint NOT NULL,
+  status text NOT NULL CHECK (status = ANY (ARRAY['created'::text, 'initiated'::text, 'processing'::text, 'authorized'::text, 'rejected'::text, 'cancelled'::text, 'communication_error'::text, 'payment_review'::text])),
+  response jsonb,
+  authorization_code text,
+  authorized_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT product_ad_transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT product_ad_transactions_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
+  CONSTRAINT product_ad_transactions_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.order_escrows (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  order_id bigint NOT NULL,
+  buyer_id uuid NOT NULL,
+  seller_id uuid NOT NULL,
+  amount numeric NOT NULL CHECK (amount > 0::numeric),
+  status text NOT NULL DEFAULT 'held'::text CHECK (status = ANY (ARRAY['held'::text, 'released'::text])),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  released_at timestamp with time zone,
+  CONSTRAINT order_escrows_pkey PRIMARY KEY (id),
+  CONSTRAINT order_escrows_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT order_escrows_buyer_id_fkey FOREIGN KEY (buyer_id) REFERENCES public.profiles(id),
+  CONSTRAINT order_escrows_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.order_seller_chats (
+  order_id bigint NOT NULL,
+  seller_id uuid NOT NULL,
+  conversation_id bigint NOT NULL UNIQUE,
+  seller_replied_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT order_seller_chats_pkey PRIMARY KEY (order_id, seller_id),
+  CONSTRAINT order_seller_chats_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT order_seller_chats_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES public.profiles(id),
+  CONSTRAINT order_seller_chats_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id)
+);
+CREATE TABLE public.notifications (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  user_id uuid NOT NULL,
+  type text NOT NULL CHECK (type = ANY (ARRAY['purchase'::text, 'sale'::text, 'message'::text])),
+  title text NOT NULL,
+  body text NOT NULL,
+  href text NOT NULL,
+  event_key text NOT NULL UNIQUE,
+  read_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.product_moderation_reviews (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  product_id bigint NOT NULL,
+  admin_id uuid,
+  action text NOT NULL CHECK (action = ANY (ARRAY['approved'::text, 'rejected'::text, 'flagged'::text, 'resubmitted'::text])),
+  reason text,
+  detector_type text,
+  risk_category text,
+  result text,
+  reason_details text,
+  match_score numeric,
+  detector_version text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT product_moderation_reviews_pkey PRIMARY KEY (id),
+  CONSTRAINT product_moderation_reviews_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
+  CONSTRAINT product_moderation_reviews_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.product_detection_results (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  product_id bigint NOT NULL,
+  detector_type text NOT NULL CHECK (detector_type = ANY (ARRAY['text'::text, 'image'::text, 'category'::text, 'manual'::text])),
+  risk_category text,
+  result text,
+  reason text,
+  match_score numeric,
+  detector_version text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT product_detection_results_pkey PRIMARY KEY (id),
+  CONSTRAINT product_detection_results_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
+);
+CREATE TABLE public.product_reports (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  product_id bigint NOT NULL,
+  reporter_id uuid NOT NULL,
+  reason text NOT NULL,
+  details text,
+  is_resolved boolean NOT NULL DEFAULT false,
+  reviewed_by uuid,
+  reviewed_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT product_reports_pkey PRIMARY KEY (id),
+  CONSTRAINT product_reports_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
+  CONSTRAINT product_reports_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES auth.users(id),
+  CONSTRAINT product_reports_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.order_commissions (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  order_id bigint NOT NULL,
+  order_item_id bigint NOT NULL UNIQUE,
+  payment_subtransaction_id uuid,
+  seller_id uuid NOT NULL,
+  store_id bigint,
+  base_amount bigint NOT NULL CHECK (base_amount > 0),
+  commission_rate_bps smallint NOT NULL DEFAULT 500 CHECK (commission_rate_bps > 0 AND commission_rate_bps <= 10000),
+  commission_amount bigint NOT NULL CHECK (commission_amount >= 0),
+  status text NOT NULL DEFAULT 'pending_settlement'::text CHECK (status = ANY (ARRAY['pending_settlement'::text, 'collected'::text, 'reversed'::text])),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  collected_at timestamp with time zone,
+  CONSTRAINT order_commissions_pkey PRIMARY KEY (id),
+  CONSTRAINT order_commissions_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT order_commissions_order_item_id_fkey FOREIGN KEY (order_item_id) REFERENCES public.order_items(id),
+  CONSTRAINT order_commissions_payment_subtransaction_id_fkey FOREIGN KEY (payment_subtransaction_id) REFERENCES public.payment_subtransactions(id),
+  CONSTRAINT order_commissions_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES public.profiles(id),
+  CONSTRAINT order_commissions_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id)
 );

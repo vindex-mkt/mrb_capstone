@@ -118,7 +118,6 @@ export async function POST(request: NextRequest) {
     || !plan
     || payment.productId !== body.productId
     || payment.durationDays !== body.durationDays
-    || payment.amount !== plan.price
     || !/^[0-9a-f-]{36}$/i.test(payment.transactionId)
     || !/^[A][a-f0-9]{20}$/i.test(payment.buyOrder)
   ) {
@@ -133,6 +132,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "No pudimos preparar el pago de forma segura." }, { status: 500 });
   }
 
+  const { data: pricedData, error: priceError } = await adminClient.rpc("set_product_ad_payment_amount", {
+    p_user_id: user.id,
+    p_transaction_id: payment.transactionId,
+  });
+  if (priceError) {
+    console.error("No se pudo fijar el precio vigente para el pago de publicidad:", priceError.message);
+    const { error: failError } = await adminClient.rpc("fail_product_ad_payment", {
+      p_user_id: user.id,
+      p_transaction_id: payment.transactionId,
+    });
+    if (failError) console.error("No se pudo cerrar el intento de publicidad sin precio actualizado:", failError.message);
+    return NextResponse.json({ message: "No pudimos preparar el pago de publicidad con el precio vigente." }, { status: 500 });
+  }
+
+  const pricedPayment = parsePayment(pricedData);
+  if (
+    !pricedPayment
+    || pricedPayment.transactionId !== payment.transactionId
+    || pricedPayment.productId !== payment.productId
+    || pricedPayment.durationDays !== payment.durationDays
+    || pricedPayment.amount !== plan.price
+    || pricedPayment.buyOrder !== payment.buyOrder
+  ) {
+    console.error("Supabase devolvió datos inválidos al fijar el precio del pago de publicidad.");
+    const { error: failError } = await adminClient.rpc("fail_product_ad_payment", {
+      p_user_id: user.id,
+      p_transaction_id: payment.transactionId,
+    });
+    if (failError) console.error("No se pudo cerrar el intento de publicidad con precio inválido:", failError.message);
+    return NextResponse.json({ message: "No pudimos preparar el pago de forma segura." }, { status: 500 });
+  }
+
   const markFailed = async () => {
     const { error: failError } = await adminClient.rpc("fail_product_ad_payment", {
       p_user_id: user.id,
@@ -143,11 +174,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const returnUrl = new URL("/api/payments/advertising/return", origin);
-    returnUrl.searchParams.set("transaction_id", payment.transactionId);
+    returnUrl.searchParams.set("transaction_id", pricedPayment.transactionId);
     const response: unknown = await transaction.create(
-      payment.buyOrder,
+      pricedPayment.buyOrder,
       randomUUID(),
-      payment.amount,
+      pricedPayment.amount,
       returnUrl.toString(),
     );
 
@@ -162,7 +193,7 @@ export async function POST(request: NextRequest) {
 
     const { error: saveError } = await adminClient.rpc("save_product_ad_token", {
       p_user_id: user.id,
-      p_transaction_id: payment.transactionId,
+      p_transaction_id: pricedPayment.transactionId,
       p_token: response.token,
     });
     if (saveError) {
@@ -174,7 +205,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       paymentUrl: response.url,
       token: response.token,
-      transactionId: payment.transactionId,
+      transactionId: pricedPayment.transactionId,
     });
   } catch (transbankError) {
     await markFailed();

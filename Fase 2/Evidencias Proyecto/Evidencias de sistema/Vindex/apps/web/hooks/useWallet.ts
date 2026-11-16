@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 export type WalletBalances = {
   available: number;
   locked: number;
+  buyerEscrow: number;
+  sellerEscrow: number;
 };
 
 type WalletState = {
@@ -50,23 +52,55 @@ export function useWallet() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("user_wallets")
-        .select("balance, locked_balance")
-        .eq("user_id", userId)
-        .maybeSingle();
+      const [{ data, error }, { data: escrows, error: escrowError }] = await Promise.all([
+        supabase
+          .from("user_wallets")
+          .select("balance, locked_balance")
+          .eq("user_id", userId)
+          .maybeSingle(),
+        supabase
+          .from("order_escrows")
+          .select("buyer_id, seller_id, amount")
+          .eq("status", "held")
+          .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`),
+      ]);
 
       if (!isCurrent || currentRequest !== requestId) return;
 
-      if (error) {
-        setWallet({ userId, balances: null, loading: false, error: error.message });
+      if (error || escrowError) {
+        setWallet({
+          userId,
+          balances: null,
+          loading: false,
+          error: error?.message ?? escrowError?.message ?? "No se pudo consultar la custodia de las órdenes.",
+        });
         return;
       }
+
+      const heldEscrows = escrows ?? [];
+      const escrowAmounts = heldEscrows.map((escrow) => parseBalance(escrow.amount));
+      if (escrowAmounts.some((amount) => amount === null)) {
+        setWallet({
+          userId,
+          balances: null,
+          loading: false,
+          error: "La billetera contiene un monto en custodia inválido.",
+        });
+        return;
+      }
+      const buyerEscrow = heldEscrows
+        .reduce((total, escrow, index) => total + (
+          escrow.buyer_id === userId ? escrowAmounts[index] ?? 0 : 0
+        ), 0);
+      const sellerEscrow = heldEscrows
+        .reduce((total, escrow, index) => total + (
+          escrow.seller_id === userId ? escrowAmounts[index] ?? 0 : 0
+        ), 0);
 
       if (!data) {
         setWallet({
           userId,
-          balances: { available: 0, locked: 0 },
+          balances: { available: 0, locked: 0, buyerEscrow, sellerEscrow },
           loading: false,
           error: null,
         });
@@ -87,7 +121,7 @@ export function useWallet() {
 
       setWallet({
         userId,
-        balances: { available, locked },
+        balances: { available, locked, buyerEscrow, sellerEscrow },
         loading: false,
         error: null,
       });

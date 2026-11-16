@@ -1,9 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { featuredPlans } from "../advertising.ts";
 import { validateAdvertisingCommitResponse } from "./advertising-validation.ts";
 
 const expectedBuyOrder = "Atest-order";
-const expectedAmount = 9990;
+const expectedAmount = 3990;
+
+test("uses the current CLP prices for all promotion durations", () => {
+  assert.deepEqual(featuredPlans, [
+    { days: 1, price: 990 },
+    { days: 3, price: 1990 },
+    { days: 7, price: 3990 },
+    { days: 14, price: 6990 },
+  ]);
+});
 
 test("authorizes a promotion only when order, amount, code and status match", () => {
   assert.equal(validateAdvertisingCommitResponse({
