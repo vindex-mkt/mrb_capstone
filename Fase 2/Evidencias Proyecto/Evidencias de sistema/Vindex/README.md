@@ -1,159 +1,194 @@
-# Turborepo starter
+# Vindex
 
-This Turborepo starter is maintained by the Turborepo core team.
+Marketplace de productos orientado al mercado chileno que integra catálogo y tiendas personalizadas, subastas, mensajería, pagos de integración y validación de entregas mediante OTP.
 
-## Using this example
+## Descripcion
 
-Run the following command:
+Vindex conecta vendedores independientes, microempresarios, artistas y creadores con compradores y coleccionistas. Resuelve la informalidad de canales como redes sociales, ofreciendo publicación de productos, carrito sincronizado, búsqueda, conversaciones y checkout Webpay Plus Mall en ambiente sandbox.
 
-```sh
-npx create-turbo@latest
+La plataforma incluye actualmente:
+
+- Registro e inicio de sesión con Supabase Auth.
+- Tiendas, perfiles y administración de publicaciones.
+- Catálogo, categorías, ofertas y carrito sincronizado.
+- Mensajería y notificaciones.
+- Subastas con Supabase Realtime y reglas de puja en base de datos.
+- Checkout Webpay Plus Mall exclusivo para integración, sin cobros reales.
+- OTP de retiro presencial para confirmar la entrega; no libera fondos ni sustituye una implementación de custodia.
+- Panel administrativo, moderación y métricas financieras simuladas.
+
+## Tecnologias
+
+| Area | Tecnologias |
+|---|---|
+| Monorepo | npm workspaces, Turborepo |
+| Web | Next.js 16, React 19, TypeScript, Tailwind CSS |
+| Mobile | React Native, Expo, Expo Router |
+| API | NestJS y TypeScript; incluido como proyecto base y evolucion futura |
+| Base de datos | PostgreSQL gestionado mediante Supabase |
+| Servicios Supabase | Auth, Storage, Realtime y RPC |
+| Pagos | Webpay Plus Mall con `transbank-sdk` en ambiente de integracion |
+| Nube | Supabase; la web puede alojarse en plataformas compatibles con Next.js, como Vercel |
+| Pruebas | Vitest, Supertest y pruebas Node.js integradas |
+
+No se utiliza Docker ni existen actualmente Dockerfile o `docker-compose.yml`. El despliegue local equivalente usa Node.js/npm y un proyecto Supabase configurado.
+
+## Requisitos
+
+- Node.js 22.18 o superior.
+- npm 11.19 o superior.
+- Git.
+- Proyecto Supabase con las tablas, migraciones, RPC, RLS y funciones necesarias.
+- Credenciales oficiales de integracion de Webpay Plus Mall para probar pagos.
+- Android Studio, Xcode o Expo Go solo si se ejecuta la app movil.
+
+## Ejecutar localmente
+
+### 1. Instalar
+
+```powershell
+git clone <URL_DEL_REPOSITORIO>
+cd Vindex
+npm install
 ```
 
-## What's inside?
+### 2. Configurar Supabase
 
-This Turborepo includes the following packages/apps:
+Crear `apps/web/.env.local` con las variables publicas necesarias:
 
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=<URL_DEL_PROYECTO_SUPABASE>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<CLAVE_PUBLICABLE_SUPABASE>
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-Without global `turbo`, use your package manager:
+Para checkout y operaciones privilegiadas se requieren variables privadas solamente en el servidor:
 
-```sh
-cd my-turborepo
-npx turbo build
-npm exec turbo build
-npm exec turbo build
+```dotenv
+SUPABASE_SERVICE_ROLE_KEY=<CLAVE_SECRETA_DE_SERVICIO>
+TRANSBANK_ENV=integration
+TRANSBANK_API_KEY=<API_KEY_DE_INTEGRACION>
+TRANSBANK_COMMERCE_CODE=<CODIGO_DE_COMERCIO_MALL>
+TRANSBANK_CHILD_COMMERCE_CODE_1=<CODIGO_COMERCIO_HIJOS_1>
+TRANSBANK_CHILD_COMMERCE_CODE_2=<CODIGO_COMERCIO_HIJOS_2>
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+No agregues claves secretas ni credenciales reales al repositorio ni uses variables `NEXT_PUBLIC_*` para secretos. Revisa `apps/web/.env.local` antes de compartirlo y elimina cualquier valor privado.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+Aplicar las migraciones de `supabase/migrations/` necesarias en el proyecto Supabase. Para checkout, leer primero `docs/WEBPAY_PLUS_MALL.md`.
 
-```sh
-turbo build --filter=docs
+### 3. Levantar la aplicacion web
+
+Desde la raiz del monorepo:
+
+```powershell
+npm run dev
 ```
 
-Without global `turbo`:
+Abrir [http://localhost:3000](http://localhost:3000).
 
-```sh
-npx turbo build --filter=docs
-npm exec turbo build --filter=docs
-npm exec turbo build --filter=docs
+Tambien puede iniciarse directamente:
+
+```powershell
+cd apps/web
+npm run dev
 ```
 
-### Develop
+### 4. Levantar la app movil
 
-To develop all apps and packages, run the following command:
+La app movil es independiente de la carpeta web:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
+```powershell
+cd apps/mobile
+npm install
+npx expo start
 ```
 
-Without global `turbo`, use your package manager:
+Seleccionar Android, iOS o web desde la terminal de Expo.
 
-```sh
-cd my-turborepo
-npx turbo dev
-npm exec turbo dev
-npm exec turbo dev
+### 5. Comandos de calidad
+
+Desde la raiz:
+
+```powershell
+npm run lint
+npm run check-types
+npm run build
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Pruebas web de checkout:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
+```powershell
+npm run test:checkout --workspace=web
 ```
 
-Without global `turbo`:
+## Variables de entorno
 
-```sh
-npx turbo dev --filter=web
-npm exec turbo dev --filter=web
-npm exec turbo dev --filter=web
+| Variable | Alcance | Uso |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Navegador y servidor | URL del proyecto Supabase |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Navegador y servidor | Clave publicable de Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Solo servidor | Operaciones privilegiadas y Webpay |
+| `NEXT_PUBLIC_SITE_URL` | Navegador y servidor | URL base y retorno HTTPS |
+| `TRANSBANK_ENV` | Solo servidor | Debe ser `integration` |
+| `TRANSBANK_API_KEY` | Solo servidor | Credencial sandbox de Transbank |
+| `TRANSBANK_COMMERCE_CODE` | Solo servidor | Comercio Mall |
+| `TRANSBANK_CHILD_COMMERCE_CODE_1/2` | Solo servidor | Comercios vendedores hijo |
+
+## Equipo
+
+| Integrante | Rol en el proyecto |
+|---|---|
+| Renato Astargo | Product Owner & Scrum Master |
+| Bryan Aravena | Frontend & QA Lead |
+| Maximiliano Vargas | LeadBackend, Database |
+
+Los roles específicos de especialidad pueden completarse según la asignación real de tareas en el seguimiento del equipo.
+
+## Metodologia de trabajo
+
+El equipo utiliza **Scrum**. Se planifican Sprints, se prioriza un Product Backlog, se ejecutan Sprint Backlogs y se realizan revisiones y retrospectivas. La Definition of Done exige desarrollo, control de cambios, migraciones y pruebas antes de considerar una historia terminada.
+
+## Arquitectura
+
+Vindex es un monorepo con una aplicacion web principal Next.js y aplicaciones complementarias:
+
+```text
+Cliente web (Next.js)
+  -> Supabase Auth / PostgreSQL / Storage / Realtime
+  -> Rutas servidor Next.js -> Webpay Plus Mall sandbox
+
+Cliente movil (React Native/Expo)
+  -> Supabase
+
+API NestJS
+  -> proyecto base/evolucion; no es la ruta principal del checkout web actual
 ```
 
-### Remote Caching
+La persistencia principal es PostgreSQL mediante Supabase. Las pujas y el reloj de subastas se sincronizan con Supabase Realtime y las reglas sensibles se ejecutan mediante RPC y migraciones SQL. Redis, Socket.io y una API NestJS separada forman objetivos de evolucion, no componentes verificables en el flujo actual.
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+- [Arquitectura tecnica](docs/ARCHITECTURE.md)
+- [Modelo de datos](docs/DATABASE.md)
+- [Decisiones arquitectonicas](docs/DECISIONS.md)
+- [Funcionalidades](docs/FEATURES.md)
+- [Integracion Webpay](docs/WEBPAY_PLUS_MALL.md)
+- [Subastas](docs/subastas.md)
+- [Autenticacion](docs/AUTHENTICATION.md)
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+## Documentacion del proyecto
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
+```text
+README.md
+docs/
+├── 01-product-vision.md
+├── 02-product-backlog.md
+├── 03-sprint-backlogs.md
+├── 04-definition-of-done.md
+├── 05-documento-diseno.md
+├── 06-retrospectivas.md
+├── 07-plan-pruebas-evidencias.md
+├── 08-manual-tecnico-despliegue.md
+└── 09-cierre-e-innovacion.md
 ```
 
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-npm exec turbo login
-npm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-npm exec turbo link
-npm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+La documentacion tecnica existente se conserva como detalle complementario. Los documentos anteriores sobre vision, backlog, sprints y DoD han sido consolidados en la estructura numerada.

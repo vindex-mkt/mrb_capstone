@@ -5,7 +5,17 @@
 <!-- Start of picture text -->
 Windex<br><!-- End of picture text -->
 
-# Metodología Ágil 
+# Metodología Ágil
+
+Documento histórico detallado. Su resumen consolidado está en:
+
+- [01-product-vision.md](./01-product-vision.md)
+- [02-product-backlog.md](./02-product-backlog.md)
+- [03-sprint-backlogs.md](./03-sprint-backlogs.md)
+- [04-definition-of-done.md](./04-definition-of-done.md)
+- [06-retrospectivas.md](./06-retrospectivas.md)
+- [07-plan-pruebas-evidencias.md](./07-plan-pruebas-evidencias.md)
+- [08-manual-tecnico-despliegue.md](./08-manual-tecnico-despliegue.md)
 
 MARCO ÁGIL, SCRUM RENATO ASTARGO – BRYAN ARAVENA – MAXIMILIANO VARGAS 
 
