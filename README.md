@@ -24,7 +24,6 @@ La plataforma incluye actualmente:
 | Monorepo | npm workspaces, Turborepo |
 | Web | Next.js 16, React 19, TypeScript, Tailwind CSS |
 | Mobile | React Native, Expo, Expo Router |
-| API | NestJS y TypeScript; incluido como proyecto base y evolucion futura |
 | Base de datos | PostgreSQL gestionado mediante Supabase |
 | Servicios Supabase | Auth, Storage, Realtime y RPC |
 | Pagos | Webpay Plus Mall con `transbank-sdk` en ambiente de integracion |
@@ -161,11 +160,9 @@ Cliente web (Next.js)
 Cliente movil (React Native/Expo)
   -> Supabase
 
-API NestJS
-  -> proyecto base/evolucion; no es la ruta principal del checkout web actual
 ```
 
-La persistencia principal es PostgreSQL mediante Supabase. Las pujas y el reloj de subastas se sincronizan con Supabase Realtime y las reglas sensibles se ejecutan mediante RPC y migraciones SQL. Redis, Socket.io y una API NestJS separada forman objetivos de evolucion, no componentes verificables en el flujo actual.
+La persistencia principal es PostgreSQL mediante Supabase. Las pujas y el reloj de subastas se sincronizan con Supabase Realtime y las reglas sensibles se ejecutan mediante RPC y migraciones SQL.
 
 - [Arquitectura tecnica](docs/ARCHITECTURE.md)
 - [Modelo de datos](docs/DATABASE.md)
