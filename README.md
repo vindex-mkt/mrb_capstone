@@ -164,28 +164,17 @@ Cliente movil (React Native/Expo)
 
 La persistencia principal es PostgreSQL mediante Supabase. Las pujas y el reloj de subastas se sincronizan con Supabase Realtime y las reglas sensibles se ejecutan mediante RPC y migraciones SQL.
 
-- [Arquitectura tecnica](docs/ARCHITECTURE.md)
-- [Modelo de datos](docs/DATABASE.md)
-- [Decisiones arquitectonicas](docs/DECISIONS.md)
-- [Funcionalidades](docs/FEATURES.md)
-- [Integracion Webpay](docs/WEBPAY_PLUS_MALL.md)
-- [Subastas](docs/subastas.md)
-- [Autenticacion](docs/AUTHENTICATION.md)
 
 ## Documentacion del proyecto
 
-```text
-README.md
-docs/
-├── 01-product-vision.md
-├── 02-product-backlog.md
-├── 03-sprint-backlogs.md
-├── 04-definition-of-done.md
-├── 05-documento-diseno.md
-├── 06-retrospectivas.md
-├── 07-plan-pruebas-evidencias.md
-├── 08-manual-tecnico-despliegue.md
-└── 09-cierre-e-innovacion.md
-```
+- [01. Product Vision](<Fase 2/Evidencias Proyecto/Evidencias de sistema/Vindex/docs/01-product-vision.md>)
+- [02. Product Backlog](<Fase 2/Evidencias Proyecto/Evidencias de sistema/Vindex/docs/02-product-backlog.md>)
+- [03. Sprint Backlogs](<Fase 2/Evidencias Proyecto/Evidencias de sistema/Vindex/docs/03-sprint-backlogs.md>)
+- [04. Definition of Done](<Fase 2/Evidencias Proyecto/Evidencias de sistema/Vindex/docs/04-definition-of-done.md>)
+- [05. Documento de Diseño](<Fase 2/Evidencias Proyecto/Evidencias de sistema/Vindex/docs/05-documento-diseno.md>)
+- [06. Retrospectivas](<Fase 2/Evidencias Proyecto/Evidencias de sistema/Vindex/docs/06-retrospectivas.md>)
+- [07. Plan de Pruebas y Evidencias](<Fase 2/Evidencias Proyecto/Evidencias de sistema/Vindex/docs/07-plan-pruebas-evidencias.md>)
+- [08. Manual Técnico y Despliegue](<Fase 2/Evidencias Proyecto/Evidencias de sistema/Vindex/docs/08-manual-tecnico-despliegue.md>)
+- [09. Cierre e Innovación](<Fase 2/Evidencias Proyecto/Evidencias de sistema/Vindex/docs/09-cierre-e-innovacion.md>)
+- [10. Modelo de datos](<Fase 2/Evidencias Proyecto/Evidencias de sistema/Vindex/docs/DATABASE.md>)
 
-La documentacion tecnica existente se conserva como detalle complementario. Los documentos anteriores sobre vision, backlog, sprints y DoD han sido consolidados en la estructura numerada.
