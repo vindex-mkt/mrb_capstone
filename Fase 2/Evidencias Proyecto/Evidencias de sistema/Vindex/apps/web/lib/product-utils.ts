@@ -1,4 +1,21 @@
 export const ANTI_SNIPING_WINDOW_MS = 210_000;
+export const DEMO_ANTI_SNIPING_WINDOW_MS = 10_000;
+export const DEMO_ANTI_SNIPING_EXTENSION_MS = 10_000;
+
+export const isDemoAuction = (product: Pick<ProductListing, "auction_mode">) =>
+	product.auction_mode === "demo";
+
+export const getAuctionAntiSnipingConfig = (
+	product: Pick<ProductListing, "auction_mode">,
+) => isDemoAuction(product)
+	? {
+		windowMs: DEMO_ANTI_SNIPING_WINDOW_MS,
+		extensionMs: DEMO_ANTI_SNIPING_EXTENSION_MS,
+	}
+	: {
+		windowMs: ANTI_SNIPING_WINDOW_MS,
+		extensionMs: 5 * 60_000,
+	};
 
 export type ProductListing = {
 	id: number;
@@ -22,6 +39,7 @@ export type ProductListing = {
 	featured_until: string | null;
 	offer_ends_at: string | null;
 	created_at: string;
+	auction_mode?: "standard" | "demo" | null;
 	starting_price?: number | null;
 	current_bid?: number | null;
 	bid_increment?: number | null;

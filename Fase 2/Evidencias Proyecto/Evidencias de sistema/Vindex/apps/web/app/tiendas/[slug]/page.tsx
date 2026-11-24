@@ -50,7 +50,14 @@ export default function PublicStorePage() {
         setStore(storeRow as Store);
         setRating(ratingRow as StoreRating | null);
         setCategories((categoryRows ?? []) as StoreCategory[]);
-        setProducts((productRows ?? []) as ProductListing[]);
+        const now = Date.now();
+        const publicProducts = ((productRows ?? []) as ProductListing[]).filter((product) =>
+          product.sale_type !== "auction" ||
+          (product.auction_ends_at !== null &&
+            product.auction_ends_at !== undefined &&
+            new Date(product.auction_ends_at).getTime() > now)
+        );
+        setProducts(publicProducts);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Error desconocido";
         if (current) setErrorMessage(`No se pudo cargar la tienda: ${message}`);

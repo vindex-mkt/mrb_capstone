@@ -100,7 +100,8 @@ En [la página de venta](../apps/web/app/vender/page.tsx), el vendedor activa **
 
 - Precio inicial (`starting_price`), expresado como pesos enteros y mayor que cero.
 - Incremento mínimo (`bid_increment`), positivo y no superior al 50% del precio inicial. Así queda espacio para aceptar la siguiente puja dentro del límite.
-- Duración (5 minutos para pruebas, 24 o 48 horas, 7 o 14 días); de ella se calcula `auction_ends_at`.
+- Duración (1 minuto para demostración, 5 minutos para pruebas, 24 o 48 horas, 7 o 14 días); de ella se calcula `auction_ends_at`.
+- La opción "1 minuto (demostración)" configura `auction_mode = 'demo'`.
 - Stock, condición, descripción, imágenes y disponibilidad de envío.
 
 Al guardar se crea la fila en `products` con `sale_type = 'auction'`, `is_auction = true`, `current_bid = NULL` y `winner_id = NULL`. El canal no se crea durante la publicación ni en el catálogo.
@@ -133,7 +134,7 @@ La regla de límites también debe estar protegida en PostgreSQL. El diseño des
 
 ### Protección anti-sniping
 
-La protección anti-sniping busca evitar que una puja enviada justo al final deje a las demás personas sin tiempo para responder. El comportamiento esperado es que una puja válida cerca del cierre extienda `auction_ends_at` cinco minutos; otra puja tardía puede volver a extenderlo. El cambio debe hacerse en PostgreSQL y propagarse a las salas mediante el UPDATE de `products`.
+La protección anti-sniping busca evitar que una puja enviada justo al final deje a las demás personas sin tiempo para responder. Las subastas estándar extienden `auction_ends_at` cinco minutos cuando quedan hasta tres minutos y treinta segundos. Las subastas creadas con duración de 1 minuto tienen `auction_mode = 'demo'`: extienden diez segundos si una puja llega en los últimos diez segundos. El cambio debe hacerse en PostgreSQL y propagarse a las salas mediante el UPDATE de `products`.
 
 El navegador tiene dos umbrales relacionados, pero distintos: la sala marca visualmente como urgente el tiempo restante de 180 segundos o menos; el hook de Realtime considera hasta 210 segundos al decidir si debe volver a consultar el cierre después de una puja tardía. Esos 30 segundos adicionales coinciden con la tolerancia descrita para el reloj de la base de datos. Ninguno de esos valores, por sí solo, implementa la extensión: hace falta el trigger configurado en Supabase.
 

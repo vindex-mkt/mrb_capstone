@@ -276,7 +276,7 @@ export default function SellProductPage() {
 		parsedBidIncrement <= 0 ||
 		maximumBidIncrement === null ||
 		parsedBidIncrement > maximumBidIncrement ||
-		!["0.08333333333333333", "24", "48", "168", "336"].includes(auctionDurationHours)
+		!["0.016666666666666666", "0.08333333333333333", "24", "48", "168", "336"].includes(auctionDurationHours)
 	);
 	const invalidStock = stock.trim() === "" ||
 		!Number.isSafeInteger(Number(stock)) ||
@@ -515,6 +515,9 @@ export default function SellProductPage() {
 				auction_ends_at: isAuction
 					? new Date(now.getTime() + Number(auctionDurationHours) * 60 * 60 * 1000).toISOString()
 					: null,
+				auction_mode: isAuction
+					? auctionDurationHours === "0.016666666666666666" ? "demo" : "standard"
+					: null,
 				winner_id: null,
 				shipping_available: shippingAvailable,
 			}).select("id").single();
@@ -730,6 +733,7 @@ export default function SellProductPage() {
 											<div className="space-y-2">
 												<Label htmlFor="auctionDuration">Duración de la subasta</Label>
 												<select id="auctionDuration" value={auctionDurationHours} onChange={(event) => setAuctionDurationHours(event.target.value)} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm">
+													<option value="0.016666666666666666">1 minuto (demostración)</option>
 													<option value="0.08333333333333333">5 minutos</option>
 													<option value="24">24 horas</option>
 													<option value="48">48 horas</option>

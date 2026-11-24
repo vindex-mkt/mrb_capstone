@@ -86,6 +86,7 @@ Los campos principales del modelo son:
 - Venta directa: `price`, `discount_price`, `offer_ends_at`, `stock`.
 - Subasta: `starting_price`, `current_bid`, `bid_increment`, `auction_ends_at`, `winner_id`.
 - Publicación: `status`, `moderation_status`, `images`, `is_featured`, `featured_until`.
+- Tipo de temporización: `auction_mode` (`standard` o `demo`).
 - Propiedad: `seller_id` y, cuando corresponde, `store_id`.
 
 Las pujas se registran en `bids`. El cliente no debe insertar pujas directamente: debe invocar la RPC transaccional `place_bid`, respaldada por validaciones y triggers de PostgreSQL. La hora del servidor se obtiene mediante `get_server_time`.

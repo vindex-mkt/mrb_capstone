@@ -19,12 +19,12 @@ const logQueryError = (section: string, message: string) => {
 
 export async function getFeaturedProducts(): Promise<ProductListing[]> {
 	const supabase = await createSupabaseServerClient();
-	const now = new Date().toISOString();
+	const featuredUntil = new Date().toISOString();
 	const { data, error } = await supabase
 		.from("products")
 		.select("*")
 		.eq("is_featured", true)
-		.gt("featured_until", now)
+		.gt("featured_until", featuredUntil)
 		.eq("moderation_status", "approved")
 		.in("status", ["active", "true"])
 		.gt("stock", 0)
@@ -35,7 +35,13 @@ export async function getFeaturedProducts(): Promise<ProductListing[]> {
 		return [];
 	}
 
-	return (data ?? []) as ProductListing[];
+	const nowMs = Date.now();
+	return ((data ?? []) as ProductListing[]).filter((product) =>
+		product.sale_type !== "auction" ||
+		(product.auction_ends_at !== null &&
+			product.auction_ends_at !== undefined &&
+			new Date(product.auction_ends_at).getTime() > nowMs)
+	);
 }
 
 export async function getDailyDeals(): Promise<ProductListing[]> {
@@ -75,7 +81,13 @@ export async function getLatestProducts(): Promise<ProductListing[]> {
 		return [];
 	}
 
-	return (data ?? []) as ProductListing[];
+	const now = Date.now();
+	return ((data ?? []) as ProductListing[]).filter((product) =>
+		product.sale_type !== "auction" ||
+		(product.auction_ends_at !== null &&
+			product.auction_ends_at !== undefined &&
+			new Date(product.auction_ends_at).getTime() > now)
+	);
 }
 
 export async function getAllPublishedProducts(): Promise<ProductListing[]> {
@@ -93,7 +105,13 @@ export async function getAllPublishedProducts(): Promise<ProductListing[]> {
 		return [];
 	}
 
-	return (data ?? []) as ProductListing[];
+	const now = Date.now();
+	return ((data ?? []) as ProductListing[]).filter((product) =>
+		product.sale_type !== "auction" ||
+		(product.auction_ends_at !== null &&
+			product.auction_ends_at !== undefined &&
+			new Date(product.auction_ends_at).getTime() > now)
+	);
 }
 
 export async function getProductById(productId: number): Promise<ProductListing | null> {

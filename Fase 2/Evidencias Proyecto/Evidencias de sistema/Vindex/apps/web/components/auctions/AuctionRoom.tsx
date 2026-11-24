@@ -13,7 +13,7 @@ import { useAuctionRealtime } from "@/hooks/useAuctionRealtime";
 import { useSynchronizedTimer } from "@/hooks/useSynchronizedTimer";
 import { createClient } from "@/lib/supabase/client";
 import {
-  ANTI_SNIPING_WINDOW_MS,
+  getAuctionAntiSnipingConfig,
   formatAuctionAmount,
   getAuctionBidLimits,
   getProductImage,
@@ -73,7 +73,11 @@ export default function AuctionRoom({
   const currentAmount = product.current_bid ?? product.starting_price;
   const isClosed = isExpired;
   const canPlaceBids = isSynced && totalSeconds !== null && totalSeconds > 0;
-  const isAntiSnipingWindow = canPlaceBids && totalSeconds !== null && totalSeconds <= 180;
+  const antiSnipingConfig = getAuctionAntiSnipingConfig(product);
+  const antiSnipingWindowSeconds = antiSnipingConfig.windowMs / 1_000;
+  const isAntiSnipingWindow = canPlaceBids &&
+    totalSeconds !== null &&
+    totalSeconds <= antiSnipingWindowSeconds;
   const seller = Array.isArray(product.seller) ? product.seller[0] : product.seller;
   const galleryImages = product.images?.length ? product.images : [getProductImage(product)];
   const padTimer = (value: number) => String(value).padStart(2, "0");
@@ -194,7 +198,7 @@ export default function AuctionRoom({
       if (error) throw error;
       const wasInAntiSnipingWindow = isSynced &&
         totalSeconds !== null &&
-        totalSeconds <= ANTI_SNIPING_WINDOW_MS / 1_000;
+        totalSeconds <= antiSnipingWindowSeconds;
       const { auctionEnd, error: syncError } = await refreshAuctionProduct();
       const previousEndMs = product.auction_ends_at ? Date.parse(product.auction_ends_at) : Number.NaN;
       const refreshedEndMs = auctionEnd ? Date.parse(auctionEnd) : Number.NaN;
@@ -252,7 +256,9 @@ export default function AuctionRoom({
       )}
       {showExtensionNotice && (
         <p role="status" className="animate-in fade-in slide-in-from-top-1 mb-5 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-medium text-emerald-800 duration-300">
-          ¡Tiempo extendido +5 min por puja tardía!
+          {product.auction_mode === "demo"
+            ? "¡Tiempo extendido +10 s por puja tardía!"
+            : "¡Tiempo extendido +5 min por puja tardía!"}
         </p>
       )}
 
@@ -349,7 +355,9 @@ export default function AuctionRoom({
                 )}
                 {isAntiSnipingWindow && (
                   <Badge variant="destructive">
-                    Zona Anti-sniping: las pujas añaden +5 min
+                    {product.auction_mode === "demo"
+                      ? "Cierre extendido: cada oferta añade +10 s"
+                      : "Cierre extendido: cada oferta añade +5 min"}
                   </Badge>
                 )}
                 {syncError && (

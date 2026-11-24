@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  ANTI_SNIPING_WINDOW_MS,
+  getAuctionAntiSnipingConfig,
   formatAuctionBid,
   parseFiniteNumber,
   type AuctionBid,
@@ -128,7 +128,8 @@ export function useAuctionRealtime(
 
     const syncProductAfterLateBid = async () => {
       const endMs = currentAuctionEnd.current ? new Date(currentAuctionEnd.current).getTime() : Number.NaN;
-      if (!Number.isFinite(endMs) || endMs <= Date.now() || endMs - Date.now() > ANTI_SNIPING_WINDOW_MS) return;
+      const antiSnipingConfig = getAuctionAntiSnipingConfig(initialProduct);
+      if (!Number.isFinite(endMs) || endMs <= Date.now() || endMs - Date.now() > antiSnipingConfig.windowMs) return;
       await refreshAuctionProduct();
     };
 

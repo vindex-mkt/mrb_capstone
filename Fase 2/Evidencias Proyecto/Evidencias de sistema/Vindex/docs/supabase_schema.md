@@ -26,6 +26,7 @@ CREATE TABLE public.products (
   bid_increment numeric DEFAULT 1000,
   auction_ends_at timestamp with time zone,
   winner_id uuid,
+  auction_mode text NOT NULL DEFAULT 'standard',
   store_category_id bigint,
   category_id uuid,
   moderation_status text NOT NULL DEFAULT 'pending_review'::text CHECK (moderation_status = ANY (ARRAY['pending_review'::text, 'approved'::text, 'rejected'::text, 'flagged'::text])),
