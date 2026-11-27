@@ -29,6 +29,20 @@ Si personalizaste la plantilla de confirmación de correo, el enlace debe usar `
 
 Si pruebas en dominios de Preview de Vercel, agrega también un patrón permitido que coincida con esos dominios, siguiendo el formato de URLs de redirect admitido por Supabase. No se requieren claves privadas en el navegador ni cambios en tablas o políticas.
 
+## Acceso a cuentas demo mediante QR
+
+La ruta `GET /demo/[code]` inicia una sesión de una cuenta demo existente y redirige a la página de inicio. El código QR contiene una URL de Vindex, no credenciales de Supabase. Cada código debe corresponder a una cuenta distinta.
+
+Configura `DEMO_LOGIN_ACCOUNTS` como JSON en el entorno del servidor, por ejemplo:
+
+```json
+[{"code":"demo1","email":"demo1@example.com"}]
+```
+
+Añade más objetos para las demás cuentas demo, usando códigos y correos únicos. Cada cuenta debe existir en Supabase Auth y tener su perfil correspondiente. El servidor usa `SUPABASE_SERVICE_ROLE_KEY` para generar un token de acceso mágico y lo verifica inmediatamente para guardar la sesión en una cookie. Mantén esa clave solo en variables de entorno del servidor; nunca la expongas con el prefijo `NEXT_PUBLIC_`.
+
+El QR para el ejemplo anterior apunta a `https://vindex-mkt.vercel.app/demo/demo1`. La misma URL se puede reutilizar; cada visita genera una sesión nueva y redirige a `/`. Prueba el enlace en una ventana privada antes de imprimirlo. Cualquier persona que tenga el QR podrá entrar en esa cuenta demo.
+
 ## Pruebas
 
 1. Ejecuta `npm run dev` desde la raíz y visita `http://localhost:3000/login`.
@@ -37,3 +51,4 @@ Si pruebas en dominios de Preview de Vercel, agrega también un patrón permitid
 4. Intenta abrir `/update-password` directamente y confirma que no aparece el formulario.
 5. Inicia sesión con la nueva contraseña. Prueba también un enlace expirado o reutilizado: debe ofrecer solicitar otro enlace.
 6. Repite el flujo en producción después de agregar la URL de callback de Vercel a la lista permitida.
+7. Configura `DEMO_LOGIN_ACCOUNTS` y `SUPABASE_SERVICE_ROLE_KEY` en el entorno local o de despliegue. Abre `/demo/demo1` en una ventana privada y confirma que se inicia la sesión de la cuenta correspondiente y se carga la página de inicio.
