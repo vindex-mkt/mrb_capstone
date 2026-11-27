@@ -22,7 +22,7 @@ Escenario B: El usuario GANA la subasta
 Abono al Precio Final: La garantía se descuenta del total que debe pagar por el producto.
 Ejemplo: Subasta ganada en $100.000 CLP con garantía previa retenida de $10.000 CLP. Al momento de pagar, el saldo pendiente es de solo $90.000 CLP.
 Escenario C: El usuario GANA pero NO PAGA (Infracción/Incumplimiento)
-Penalización y Retención Definitiva: Se establece un plazo límite de pago (ej. 24 a 48 horas). Si el ganador no completa el pago del saldo restante, pierde la garantía retenida.
+Penalización y Retención Definitiva: El ganador dispone de 24 horas desde el cierre para pagar el saldo restante. Si no completa el pago, la orden vence y pierde la garantía aplicada. El 70% se acredita al saldo del vendedor y el 30% se registra para Vindex.
 Distribución de la Penalización:
 70% para el Vendedor: Como compensación por el tiempo perdido y la falla de la venta.
 30% para Vindex: Por concepto de comisión operacional e infracción a las políticas de la plataforma.
@@ -38,7 +38,7 @@ La página explica el flujo de garantías y ofrece accesos a las secciones de in
 
 La migración [`20261127170000_wallet_webpay_topups.sql`](../supabase/migrations/20261127170000_wallet_webpay_topups.sql) crea el ledger de recargas y las RPC para crear, confirmar y acreditar pagos de forma idempotente. El saldo se incrementa solo cuando Transbank devuelve una autorización que coincide con la orden y el monto esperados. La migración requiere que la tabla `user_wallets` ya esté desplegada.
 
-La migración [`20261127160000_auction_guarantees.sql`](../supabase/migrations/20261127160000_auction_guarantees.sql) integra la reserva con la RPC de puja y agrega la liquidación al cierre: devuelve a disponibilidad las garantías de quienes pierden y aplica la garantía del ganador al precio, mostrando el saldo pendiente. Si `pg_cron` está habilitado, programa la liquidación en segundo plano cada minuto; la sala también la invoca al llegar a cero o al cargar la subasta finalizada. No realizar cambios de saldo desde el cliente.
+La migración [`20261127160000_auction_guarantees.sql`](../supabase/migrations/20261127160000_auction_guarantees.sql) integra la reserva con la RPC de puja y agrega la liquidación al cierre: devuelve a disponibilidad las garantías de quienes pierden y aplica la garantía del ganador al precio. La migración [`20261127180000_auction_winner_payments.sql`](../supabase/migrations/20261127180000_auction_winner_payments.sql) crea la orden de compra, notifica al ganador, registra el saldo pendiente y vence órdenes impagas después de 24 horas. Si `pg_cron` está habilitado, ambos procesos se ejecutan en segundo plano; el cierre y el vencimiento también se comprueban al consultar Mis compras. No realizar cambios de saldo desde el cliente.
 
 ## Custodia de entregas a coordinar
 

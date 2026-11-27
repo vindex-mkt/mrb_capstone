@@ -13,6 +13,7 @@ type PendingPayment = {
   paymentStatus: string;
   createdAt: string;
   total: number;
+  isAuctionOrder?: boolean;
   resolutionMessage?: string | null;
 };
 
@@ -92,7 +93,11 @@ export default function PendingWebpayPayments() {
       if (result.state === "retryable") {
         showToast(result.message ?? "El intento anterior se cerró.", "success");
         await loadPayments();
-        if (action === "retry") router.push("/checkout");
+        if (action === "retry") {
+          router.push(payment.isAuctionOrder
+            ? `/profile?tab=purchases&auctionOrderId=${payment.orderId}`
+            : "/checkout");
+        }
         return;
       }
 

@@ -173,6 +173,11 @@ CREATE TABLE public.orders (
   delivery_code text,
   delivery_status text NOT NULL DEFAULT 'pending_pickup'::text,
   shipping_method text NOT NULL DEFAULT 'standard'::text CHECK (shipping_method = ANY (ARRAY['standard'::text, 'pickup'::text])),
+  auction_product_id bigint UNIQUE REFERENCES public.products(id),
+  auction_final_price numeric,
+  auction_guarantee_amount numeric,
+  auction_amount_due numeric,
+  payment_due_at timestamp with time zone,
   CONSTRAINT orders_pkey PRIMARY KEY (id),
   CONSTRAINT orders_buyer_id_fkey FOREIGN KEY (buyer_id) REFERENCES public.profiles(id)
 );
@@ -226,9 +231,25 @@ CREATE TABLE public.auction_guarantees (
   CONSTRAINT auction_guarantees_pkey PRIMARY KEY (id),
   CONSTRAINT auction_guarantees_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
+CREATE TABLE public.auction_guarantee_forfeitures (
+  order_id bigint NOT NULL,
+  auction_id bigint NOT NULL,
+  winner_id uuid NOT NULL,
+  seller_id uuid NOT NULL,
+  guarantee_amount numeric NOT NULL CHECK (guarantee_amount > 0),
+  seller_credit numeric NOT NULL CHECK (seller_credit >= 0),
+  platform_amount numeric NOT NULL CHECK (platform_amount >= 0),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT auction_guarantee_forfeitures_pkey PRIMARY KEY (order_id),
+  CONSTRAINT auction_guarantee_forfeitures_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT auction_guarantee_forfeitures_auction_id_fkey FOREIGN KEY (auction_id) REFERENCES public.products(id),
+  CONSTRAINT auction_guarantee_forfeitures_winner_id_fkey FOREIGN KEY (winner_id) REFERENCES auth.users(id),
+  CONSTRAINT auction_guarantee_forfeitures_seller_id_fkey FOREIGN KEY (seller_id) REFERENCES auth.users(id),
+  CONSTRAINT auction_guarantee_forfeitures_amounts_check CHECK (seller_credit + platform_amount = guarantee_amount)
+);
 CREATE TABLE public.payment_transactions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  order_id bigint NOT NULL UNIQUE,
+  order_id bigint NOT NULL,
   mall_buy_order text NOT NULL UNIQUE,
   transbank_token text UNIQUE,
   total_amount bigint NOT NULL CHECK (total_amount > 0),

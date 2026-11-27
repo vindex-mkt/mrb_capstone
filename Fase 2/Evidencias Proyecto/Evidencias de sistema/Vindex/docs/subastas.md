@@ -57,7 +57,9 @@ En resumen: Next.js prepara los datos iniciales; el navegador hace interactiva l
 5. En la sala, el cliente abre un canal Realtime filtrado para ese producto. Los INSERT de `bids` actualizan el historial y el monto; los UPDATE de `products` sincronizan la puja actual y el vencimiento.
 6. Para registrar una oferta, el cliente llama a la función RPC transaccional `place_bid`. No se insertan filas en `bids` directamente desde el navegador.
 7. En la primera puja válida, la misma transacción retiene el 10% del precio base como garantía; las siguientes pujas de esa persona en la subasta no vuelven a cobrarla.
-8. Al finalizar la subasta, `settle_auction_guarantees` devuelve las garantías de los participantes que no ganaron y aplica la del ganador al precio final. El saldo pendiente del ganador es el precio final menos la garantía aplicada.
+8. Al finalizar la subasta, `settle_auction_guarantees` devuelve las garantías de los participantes que no ganaron y aplica la del ganador al precio final. Crea una orden visible en Perfil → Comprador → Mis compras, con plazo de pago de 24 horas; el saldo pendiente es el precio final menos la garantía aplicada.
+9. Se envía al ganador una notificación en tiempo real con un enlace directo a esa orden. Puede pagar el saldo restante con Webpay Plus Mall; los rechazos confirmados permiten reintentar dentro del plazo.
+10. Si el ganador no paga al vencimiento, la orden pasa a `payment_expired` y la garantía se distribuye una sola vez: 70% al saldo del vendedor y 30% se registra para Vindex. Los intentos Webpay no resueltos se concilian antes de aplicar la penalización.
 
 ## Modelo de datos
 
@@ -139,6 +141,8 @@ El hook [useSynchronizedTimer.ts](../apps/web/hooks/useSynchronizedTimer.ts) sin
 La regla de límites también debe estar protegida en PostgreSQL. La RPC `place_bid` bloquea la fila del producto, comprueba los límites y reserva la garantía y la puja en una sola transacción. La validación del navegador mejora la experiencia, pero no sustituye esta protección de base de datos.
 
 La migración [`20261127160000_auction_guarantees.sql`](../supabase/migrations/20261127160000_auction_guarantees.sql) versiona la reserva y liquidación de garantías. Cuando `pg_cron` está habilitado, la migración programa la liquidación en segundo plano cada minuto; la web también la invoca cuando una sala llega a cero o se abre después del cierre. Verifica los triggers preexistentes de pujas y anti-sniping en el proyecto Supabase antes de desplegar.
+
+La migración [`20261127180000_auction_winner_payments.sql`](../supabase/migrations/20261127180000_auction_winner_payments.sql) crea la orden del ganador y su notificación, registra el saldo pendiente descontando la garantía, integra el pago restante con Webpay y vence órdenes impagas a las 24 horas. Aplícala después de las migraciones de garantías y wallet, y confirma que exista la tabla `notifications`. La consulta de Mis compras también liquida cierres vencidos como alternativa cuando `pg_cron` no está habilitado.
 
 ### Protección anti-sniping
 

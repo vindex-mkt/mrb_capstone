@@ -35,6 +35,7 @@ El esquema completo versionado se encuentra en [supabase_schema.md](./supabase_s
 | `user_wallets` | Saldo disponible y saldo bloqueado |
 | `wallet_topup_transactions` | Recargas Webpay Plus y conciliación del saldo |
 | `auction_guarantees` | Garantía reservada para participar en subastas |
+| `auction_guarantee_forfeitures` | Distribución auditable de garantías de ganadores que no pagaron |
 | `order_commissions` | Registro de comisión por línea pagada |
 
 ## Entidades de administración
@@ -99,7 +100,9 @@ Las pujas se registran en `bids`. `bid_increment` debe ser al menos el valor que
 
 `orders` representa la compra y `order_items` sus líneas. Los precios persistidos y los stocks deben validarse en el servidor; el navegador no debe ser la fuente de verdad del importe.
 
-Los métodos de entrega admitidos son `standard` y `pickup`. El retiro puede asociar OTP y chats de coordinación por vendedor.
+Los métodos de entrega admitidos son `standard` y `pickup`. El retiro puede asociar OTP y chats de coordinación por vendedor. Una orden de subasta guarda el producto, precio final, garantía aplicada, saldo pendiente y fecha límite; la garantía no se vuelve a cobrar como parte de Webpay.
+
+Cada producto de subasta puede generar una sola orden ganadora. Las transacciones Webpay pueden tener varios intentos para esa orden, por lo que `payment_transactions.order_id` no es único; la aplicación usa el intento más reciente para mostrar el estado.
 
 ## Webpay Plus Mall
 

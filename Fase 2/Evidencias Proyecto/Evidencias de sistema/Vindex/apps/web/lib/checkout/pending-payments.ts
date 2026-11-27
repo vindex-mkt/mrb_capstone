@@ -38,7 +38,7 @@ export async function listBuyerPendingPayments(
 ) {
   const { data: orders, error: ordersError } = await admin
     .from("orders")
-    .select("id, total, status")
+    .select("id, total, status, auction_product_id, auction_amount_due")
     .eq("buyer_id", buyerId)
     .eq("payment_method", "webpay_plus_mall")
     .order("created_at", { ascending: false })
@@ -85,7 +85,8 @@ export async function listBuyerPendingPayments(
       orderStatus: order.status,
       paymentStatus,
       createdAt: transaction.created_at,
-      total: Number(order.total),
+      total: Number(order.auction_amount_due ?? order.total),
+      isAuctionOrder: order.auction_product_id !== null,
       resolutionMessage,
     });
   }
@@ -112,6 +113,9 @@ export async function resolveBuyerPendingPayment(
     .from("payment_transactions")
     .select("id, order_id, mall_buy_order, transbank_token, status, created_at, total_amount")
     .eq("order_id", orderId)
+    .in("status", [...ACTIVE_PAYMENT_STATUSES])
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   if (transactionError) throw transactionError;
   if (!transaction) return { state: "pending", message: "Esta orden no tiene una transacción Webpay pendiente." };

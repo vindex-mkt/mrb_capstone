@@ -22,6 +22,9 @@ import {
   type AuctionProduct,
 } from "@/lib/product-utils";
 
+const MAX_SETTLEMENT_ATTEMPTS = 5;
+const SETTLEMENT_RETRY_DELAY_MS = 1_000;
+
 function formatBidTime(value: string) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return "Hora no disponible";
@@ -158,20 +161,36 @@ export default function AuctionRoom({
       setSettlingGuarantees(true);
       setSettlementError(null);
       try {
-        const { data, error } = await supabase.rpc("settle_auction_guarantees", {
-          p_auction_id: product.id,
-        });
-        if (error) throw error;
+        let result: Record<string, unknown> | null = null;
+        for (let attempt = 0; attempt < MAX_SETTLEMENT_ATTEMPTS; attempt += 1) {
+          const { data, error } = await supabase.rpc("settle_auction_guarantees", {
+            p_auction_id: product.id,
+          });
+          if (error) throw error;
 
-        const result = typeof data === "object" && data !== null
-          ? data as Record<string, unknown>
-          : null;
+          result = typeof data === "object" && data !== null
+            ? data as Record<string, unknown>
+            : null;
+          if (result?.success === true) break;
+
+          const message = typeof result?.message === "string"
+            ? result.message
+            : "La base de datos no confirmó la liquidación de garantías.";
+          if (
+            message !== "La subasta todavía no ha finalizado." ||
+            attempt === MAX_SETTLEMENT_ATTEMPTS - 1
+          ) {
+            throw new Error(message);
+          }
+
+          await new Promise<void>((resolve) => {
+            window.setTimeout(resolve, SETTLEMENT_RETRY_DELAY_MS);
+          });
+          if (!isCurrent) return;
+        }
+
         if (!result || result.success !== true) {
-          throw new Error(
-            typeof result?.message === "string"
-              ? result.message
-              : "La base de datos no confirmó la liquidación de garantías.",
-          );
+          throw new Error("La base de datos no confirmó la liquidación de garantías.");
         }
 
         if (!isCurrent) return;

@@ -12,9 +12,15 @@ export async function GET() {
 
   try {
     const adminClient = createSupabaseAdminClient();
+    const { error: settlementError } = await adminClient.rpc("settle_expired_auction_guarantees");
+    if (settlementError) throw settlementError;
+
+    const { error: expirationError } = await adminClient.rpc("expire_unpaid_auction_orders");
+    if (expirationError) throw expirationError;
+
     const { data: orders, error: ordersError } = await adminClient
       .from("orders")
-      .select("id, status, created_at, total, shipping_address, delivery_status, shipping_method")
+      .select("id, status, created_at, total, shipping_address, delivery_status, shipping_method, auction_product_id, auction_final_price, auction_guarantee_amount, auction_amount_due, payment_due_at")
       .eq("buyer_id", user.id)
       .order("created_at", { ascending: false });
     if (ordersError) throw ordersError;

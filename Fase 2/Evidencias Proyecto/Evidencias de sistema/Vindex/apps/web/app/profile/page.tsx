@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Package, ShoppingBag, Store, Truck, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,12 +61,16 @@ type ProductDraft = {
 
 type ProductCategory = { id: string; name: string };
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const search = searchParams.toString();
   const [supabase] = useState(createClient);
   const { showToast } = useToast();
   // Estado para alternar entre perfil de Comprador y Vendedor
   const [activeRole, setActiveRole] = useState<"buyer" | "seller">("buyer");
+  const [buyerTab, setBuyerTab] = useState<"account" | "purchases">("account");
+  const [highlightPurchaseOrderId, setHighlightPurchaseOrderId] = useState<number | null>(null);
 
   // Estados de datos personales
   const [firstName, setFirstName] = useState("");
@@ -96,6 +100,17 @@ export default function ProfilePage() {
   const [references, setReferences] = useState("");
   const cities = CHILE_LOCATIONS.find((location) => location.region === region)?.cities ?? [];
   const communes = cities.find((location) => location.name === city)?.communes ?? [];
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const orderId = Number(params.get("auctionOrderId"));
+    if (params.get("tab") === "purchases" || (Number.isSafeInteger(orderId) && orderId > 0)) {
+      setBuyerTab("purchases");
+    }
+    if (Number.isSafeInteger(orderId) && orderId > 0) {
+      setHighlightPurchaseOrderId(orderId);
+    }
+  }, [search]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -428,7 +443,13 @@ export default function ProfilePage() {
 
           {/* MODO COMPRADOR: Datos de Usuario y Dirección */}
           {activeRole === "buyer" && (
-            <Tabs defaultValue="account" className="space-y-5">
+            <Tabs
+              value={buyerTab}
+              onValueChange={(value) => {
+                if (value === "account" || value === "purchases") setBuyerTab(value);
+              }}
+              className="space-y-5"
+            >
               <TabsList aria-label="Secciones del perfil comprador" className="grid !h-14 w-full grid-cols-2 items-stretch rounded-xl border border-border bg-surface p-1 pb-3">
                 <TabsTrigger value="account" className="h-auto min-h-10 gap-2 rounded-lg after:hidden data-active:bg-brand-50 data-active:text-brand-700">
                   <UserRound className="h-4 w-4" />
@@ -576,7 +597,7 @@ export default function ProfilePage() {
             </form>
               </TabsContent>
               <TabsContent value="purchases">
-                <BuyerPurchases />
+                <BuyerPurchases highlightOrderId={highlightPurchaseOrderId} />
               </TabsContent>
             </Tabs>
           )}
@@ -769,5 +790,13 @@ export default function ProfilePage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div className="container-site py-8 text-sm text-muted-foreground">Cargando tu perfil...</div>}>
+      <ProfilePageContent />
+    </Suspense>
   );
 }

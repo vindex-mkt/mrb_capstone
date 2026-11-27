@@ -21,6 +21,11 @@ type Order = {
   shipping_address: string;
   delivery_status: string;
   shipping_method?: string;
+  auction_product_id?: number | null;
+  auction_final_price?: number | null;
+  auction_guarantee_amount?: number | null;
+  auction_amount_due?: number | null;
+  payment_due_at?: string | null;
 };
 
 type OrderItem = {
@@ -64,13 +69,17 @@ type BuyerOrdersResponse = {
   message?: string;
 };
 
+type BuyerPurchasesProps = {
+  highlightOrderId?: number | null;
+};
+
 const isPickupOrder = (order: Order) =>
   order.shipping_method === "pickup"
   || order.shipping_address.toLocaleLowerCase("es").includes("coordinar con el vendedor")
   || order.shipping_address.toLocaleLowerCase("es").includes("acordar con el vendedor")
   || order.shipping_address.toLocaleLowerCase("es").startsWith("retiro en tienda");
 
-export default function BuyerPurchases() {
+export default function BuyerPurchases({ highlightOrderId = null }: BuyerPurchasesProps) {
   const router = useRouter();
   const [supabase] = useState(createClient);
   const { showToast } = useToast();
@@ -88,6 +97,13 @@ export default function BuyerPurchases() {
   const [refreshingCoordinationOrderId, setRefreshingCoordinationOrderId] = useState<number | null>(null);
   const [confirmingDeliveryOrderId, setConfirmingDeliveryOrderId] = useState<number | null>(null);
   const [heldEscrowOrderIds, setHeldEscrowOrderIds] = useState<Set<number>>(new Set());
+  const [payingAuctionOrderId, setPayingAuctionOrderId] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     let current = true;
@@ -214,6 +230,68 @@ export default function BuyerPurchases() {
       current = false;
     };
   }, [supabase]);
+
+  useEffect(() => {
+    if (loading || !highlightOrderId) return;
+    let attempts = 0;
+    let timeoutId: number;
+    const scrollToOrder = () => {
+      const orderElement = document.getElementById(`purchase-order-${highlightOrderId}`);
+      if (orderElement?.getClientRects().length) {
+        orderElement.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else if (attempts < 10) {
+        attempts += 1;
+        timeoutId = window.setTimeout(scrollToOrder, 100);
+      }
+    };
+
+    timeoutId = window.setTimeout(scrollToOrder, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [highlightOrderId, items, loading]);
+
+  const beginAuctionPayment = async (orderId: number) => {
+    if (payingAuctionOrderId !== null) return;
+    setPayingAuctionOrderId(orderId);
+    try {
+      const response = await fetch(`/api/payments/auction/${orderId}/initiate`, {
+        method: "POST",
+        cache: "no-store",
+      });
+      const result = await response.json() as {
+        message?: unknown;
+        paymentUrl?: unknown;
+        token?: unknown;
+      };
+      if (
+        !response.ok
+        || typeof result.paymentUrl !== "string"
+        || typeof result.token !== "string"
+      ) {
+        throw new Error(
+          typeof result.message === "string"
+            ? result.message
+            : "No se pudo iniciar el pago de la subasta.",
+        );
+      }
+
+      const paymentForm = document.createElement("form");
+      paymentForm.method = "POST";
+      paymentForm.action = result.paymentUrl;
+      const tokenInput = document.createElement("input");
+      tokenInput.type = "hidden";
+      tokenInput.name = "token_ws";
+      tokenInput.value = result.token;
+      paymentForm.appendChild(tokenInput);
+      document.body.appendChild(paymentForm);
+      paymentForm.submit();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "No se pudo iniciar el pago de la subasta.",
+        "error",
+      );
+      setPayingAuctionOrderId(null);
+    }
+  };
 
   const openRating = (item: PurchaseItem) => {
     setRatingItem(item);
@@ -374,12 +452,29 @@ export default function BuyerPurchases() {
                 : ["paid", "completed", "delivered"].includes(item.order.status.toLowerCase())) && item.product_id !== null;
               const hasRated = item.product_id !== null && ratedProductIds.has(item.product_id);
               const isFirstOrderItem = items.findIndex((purchase) => purchase.order.id === item.order.id) === index;
+              const isAuctionOrder = item.order.auction_product_id !== null
+                && item.order.auction_product_id !== undefined;
+              const paymentDeadline = item.order.payment_due_at
+                ? new Date(item.order.payment_due_at)
+                : null;
+              const auctionPaymentExpired = paymentDeadline !== null
+                && paymentDeadline.getTime() <= now;
+              const canPayAuction = isAuctionOrder
+                && ["pending_payment", "payment_failed"].includes(item.order.status.toLowerCase())
+                && paymentDeadline !== null
+                && !auctionPaymentExpired;
               const deliveryCode = deliveryCodes[item.order.id];
               const orderChats = sellerChats.filter((chat) => chat.order_id === item.order.id);
               const sellersHaveReplied = orderChats.length > 0 && orderChats.every((chat) => chat.seller_replied_at);
 
               return (
-                <li key={item.id} className="flex flex-col gap-4 py-5 first:pt-0 sm:flex-row sm:items-center">
+                <li
+                  key={item.id}
+                  id={isFirstOrderItem && isAuctionOrder ? `purchase-order-${item.order.id}` : undefined}
+                  className={`flex flex-col gap-4 py-5 first:pt-0 sm:flex-row sm:items-center ${
+                    highlightOrderId === item.order.id ? "rounded-xl ring-2 ring-brand-600 ring-offset-4 ring-offset-surface" : ""
+                  }`}
+                >
                   <img
                     src={item.product?.images?.[0] ?? "https://picsum.photos/seed/vindex-purchase/160/160"}
                     alt={item.product?.name ?? "Producto no disponible"}
@@ -389,12 +484,71 @@ export default function BuyerPurchases() {
                     <p className="font-semibold text-foreground">{item.product?.name ?? "Producto no disponible"}</p>
                     <p className="mt-1 text-sm text-muted-foreground">Pedido #{item.order.id} · {new Date(item.order.created_at).toLocaleDateString("es-CL")}</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {item.quantity} × {formatProductPrice(Number(item.unit_price))} · Estado: {pickupOrder
+                      {item.quantity} × {formatProductPrice(Number(item.unit_price))} · Estado: {isAuctionOrder
+                        ? item.order.status === "payment_expired"
+                          ? "Plazo de pago vencido"
+                          : paymentConfirmed
+                            ? "Pago completado"
+                            : "Pago pendiente"
+                        : pickupOrder
                         ? !paymentConfirmed
                           ? item.order.status === "partially_paid" ? "Pago parcialmente autorizado" : "Pago pendiente o rechazado"
                           : deliveryCompleted ? "Entregado" : "Pendiente de coordinación"
                         : deliveryCompleted ? "Entregado" : item.order.status}
                     </p>
+                    {isAuctionOrder && isFirstOrderItem && (
+                      <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50/70 p-4">
+                        <p className="font-semibold text-foreground">Subasta ganada</p>
+                        <dl className="mt-2 space-y-1 text-sm text-muted-foreground">
+                          <div className="flex justify-between gap-3">
+                            <dt>Precio final</dt>
+                            <dd className="font-medium text-foreground">
+                              {formatProductPrice(Number(item.order.auction_final_price ?? item.unit_price))}
+                            </dd>
+                          </div>
+                          <div className="flex justify-between gap-3">
+                            <dt>Garantía aplicada</dt>
+                            <dd className="font-medium text-foreground">
+                              −{formatProductPrice(Number(item.order.auction_guarantee_amount ?? 0))}
+                            </dd>
+                          </div>
+                          <div className="flex justify-between gap-3 border-t border-brand-200 pt-1">
+                            <dt className="font-semibold text-foreground">Saldo pendiente</dt>
+                            <dd className="font-bold text-foreground">
+                              {formatProductPrice(Number(item.order.auction_amount_due ?? item.order.total))}
+                            </dd>
+                          </div>
+                        </dl>
+                        {paymentDeadline && Number.isFinite(paymentDeadline.getTime()) && (
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {auctionPaymentExpired ? "Plazo vencido:" : "Paga antes de:"}{" "}
+                            {paymentDeadline.toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" })}
+                          </p>
+                        )}
+                        {canPayAuction ? (
+                          <Button
+                            type="button"
+                            className="mt-3"
+                            disabled={payingAuctionOrderId !== null}
+                            onClick={() => void beginAuctionPayment(item.order.id)}
+                          >
+                            {payingAuctionOrderId === item.order.id
+                              ? "Conectando con Webpay..."
+                              : "Pagar saldo restante"}
+                          </Button>
+                        ) : auctionPaymentExpired && item.order.status !== "payment_expired" ? (
+                          <p className="mt-2 text-sm text-amber-900">
+                            El plazo venció; la orden se cerrará automáticamente según las condiciones de la subasta.
+                          </p>
+                        ) : item.order.status === "payment_expired" ? (
+                          <p className="mt-2 text-sm text-red-800">
+                            El plazo venció y la garantía aplicada quedó retenida como penalización.
+                          </p>
+                        ) : paymentConfirmed ? (
+                          <p className="mt-2 text-sm text-emerald-800">El pago de la subasta está confirmado.</p>
+                        ) : null}
+                      </div>
+                    )}
                     {pickupOrder && paymentConfirmed && isFirstOrderItem && (
                       <div className={`mt-4 rounded-xl border p-4 ${deliveryCompleted ? "border-emerald-200 bg-emerald-50" : "border-brand-200 bg-brand-50/70"}`}>
                         {deliveryCompleted ? (

@@ -34,6 +34,16 @@ Actualiza un producto.
 
 Elimina un producto.
 
+## Compras de subastas
+
+### GET /api/orders/mine
+
+Requiere sesión autenticada. Devuelve las órdenes del comprador, incluyendo órdenes ganadas en subasta, el precio final, la garantía aplicada, el saldo pendiente y la fecha límite. También liquida subastas cerradas y aplica penalizaciones vencidas si `pg_cron` no está disponible.
+
+### POST /api/payments/auction/:orderId/initiate
+
+Requiere sesión autenticada y que la orden pertenezca al usuario, siga pendiente y esté dentro de las 24 horas desde el cierre de la subasta. Inicia Webpay Plus Mall por el saldo restante (precio final menos garantía) y devuelve URL/token para redirigir a Transbank. La confirmación continúa por los endpoints Webpay existentes; rechazos definitivos permiten volver a intentar antes del vencimiento.
+
 ## Recargas de billetera
 
 ### POST /api/payments/wallet/initiate

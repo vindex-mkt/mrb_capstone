@@ -87,7 +87,7 @@ export function useSynchronizedTimer(endsAt: string | null): SynchronizedTimer {
 
   const endTimeMs = endsAt ? Date.parse(endsAt) : Number.NaN;
   const totalSeconds = isSynced && serverNowMs !== null && Number.isFinite(endTimeMs)
-    ? Math.max(0, Math.floor((endTimeMs - serverNowMs) / 1_000))
+    ? Math.max(0, Math.ceil((endTimeMs - serverNowMs) / 1_000))
     : null;
 
   return {
