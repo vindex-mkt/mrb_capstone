@@ -12,6 +12,23 @@ export { isRecord } from "./record";
 export const RETURN_TOKEN_COOKIE = "vindex_webpay_return_token";
 export const CANCEL_TOKEN_COOKIE = "vindex_webpay_cancel_token";
 
+export const createWebpayPlusTransaction = () => {
+  const environment = process.env.TRANSBANK_ENV?.trim().toLowerCase();
+  const apiKey = process.env.TRANSBANK_API_KEY;
+
+  if (
+    !["integration", "sandbox"].includes(environment ?? "")
+    || apiKey !== IntegrationApiKeys.WEBPAY
+  ) {
+    throw new Error("Webpay Plus requiere credenciales de integración configuradas en el servidor.");
+  }
+
+  return WebpayPlus.Transaction.buildForIntegration(
+    IntegrationCommerceCodes.WEBPAY_PLUS,
+    apiKey,
+  );
+};
+
 export const createAdvertisingTransaction = () => {
   const environment = process.env.TRANSBANK_ENV?.trim().toLowerCase();
   const apiKey = process.env.TRANSBANK_API_KEY;
@@ -29,10 +46,7 @@ export const createAdvertisingTransaction = () => {
     throw new Error("La publicidad solo puede cobrarse con las credenciales de integración de Transbank.");
   }
 
-  return WebpayPlus.Transaction.buildForIntegration(
-    IntegrationCommerceCodes.WEBPAY_PLUS,
-    apiKey,
-  );
+  return createWebpayPlusTransaction();
 };
 
 export const createMallTransaction = () => {

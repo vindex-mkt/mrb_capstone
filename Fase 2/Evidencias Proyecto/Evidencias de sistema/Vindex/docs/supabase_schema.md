@@ -200,6 +200,21 @@ CREATE TABLE public.user_wallets (
   CONSTRAINT user_wallets_pkey PRIMARY KEY (id),
   CONSTRAINT user_wallets_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
+CREATE TABLE public.wallet_topup_transactions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  buy_order text NOT NULL UNIQUE,
+  transbank_token text UNIQUE,
+  amount bigint NOT NULL CHECK (amount > 0 AND amount <= 999999999),
+  status text NOT NULL CHECK (status = ANY (ARRAY['created'::text, 'initiated'::text, 'processing'::text, 'authorized'::text, 'rejected'::text, 'cancelled'::text, 'communication_error'::text, 'payment_review'::text])),
+  response jsonb,
+  authorization_code text,
+  authorized_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT wallet_topup_transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT wallet_topup_transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
 CREATE TABLE public.auction_guarantees (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   auction_id bigint NOT NULL,

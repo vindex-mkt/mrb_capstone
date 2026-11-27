@@ -60,6 +60,21 @@ export type AuctionBidLimits = {
 	maximum: number;
 };
 
+export const AUCTION_GUARANTEE_RATE = 0.1;
+
+export const getAuctionGuaranteeAmount = (startingPrice: number | null) => {
+	if (
+		typeof startingPrice !== "number" ||
+		!Number.isSafeInteger(startingPrice) ||
+		startingPrice <= 0
+	) {
+		return null;
+	}
+
+	const guarantee = Math.ceil(startingPrice * AUCTION_GUARANTEE_RATE);
+	return Number.isSafeInteger(guarantee) ? guarantee : null;
+};
+
 export const getAuctionBidLimits = (
 	product: Pick<AuctionProduct, "starting_price" | "current_bid" | "bid_increment">,
 ): AuctionBidLimits | null => {

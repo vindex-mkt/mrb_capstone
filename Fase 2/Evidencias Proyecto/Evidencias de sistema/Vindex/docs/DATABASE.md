@@ -33,6 +33,7 @@ El esquema completo versionado se encuentra en [supabase_schema.md](./supabase_s
 | `order_escrows` | Custodia simulada o virtual asociada a una orden |
 | `order_seller_chats` | Coordinación de retiro y respuesta de vendedores |
 | `user_wallets` | Saldo disponible y saldo bloqueado |
+| `wallet_topup_transactions` | Recargas Webpay Plus y conciliación del saldo |
 | `auction_guarantees` | Garantía reservada para participar en subastas |
 | `order_commissions` | Registro de comisión por línea pagada |
 
@@ -56,7 +57,8 @@ auth.users
   ├── favorites ───────────── products
   ├── conversations ───────── messages
   ├── orders ── order_items ── products
-  └── user_wallets
+  ├── user_wallets
+  └── wallet_topup_transactions
 
 stores
   ├── store_categories
@@ -104,6 +106,8 @@ Los métodos de entrega admitidos son `standard` y `pickup`. El retiro puede aso
 `payment_transactions` representa el pago Mall y `payment_subtransactions` representa los comercios vendedores hijos. Los estados deben registrarse desde el servidor después de confirmar la respuesta de Transbank.
 
 Las operaciones privilegiadas se realizan mediante RPC disponibles principalmente para `service_role`. Los detalles completos del flujo, conciliación y escenarios de prueba están en [WEBPAY_PLUS_MALL.md](./WEBPAY_PLUS_MALL.md).
+
+Las recargas de billetera usan una transacción Webpay Plus (no Mall) y se registran en `wallet_topup_transactions`. Solo la confirmación del servidor contra Transbank puede acreditar el monto a `user_wallets`; los errores ambiguos quedan en revisión y bloquean otro intento hasta conciliarse.
 
 ## Supabase Auth y seguridad
 

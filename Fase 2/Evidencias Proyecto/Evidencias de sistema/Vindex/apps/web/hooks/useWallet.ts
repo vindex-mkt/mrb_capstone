@@ -144,6 +144,7 @@ export function useWallet() {
     };
 
     void loadUser();
+    window.addEventListener("vindex:wallet-updated", loadUser);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       void loadWallet(session?.user.id ?? null);
@@ -151,6 +152,7 @@ export function useWallet() {
 
     return () => {
       isCurrent = false;
+      window.removeEventListener("vindex:wallet-updated", loadUser);
       subscription.unsubscribe();
     };
   }, [supabase]);

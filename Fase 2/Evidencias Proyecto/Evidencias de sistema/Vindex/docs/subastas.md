@@ -56,6 +56,8 @@ En resumen: Next.js prepara los datos iniciales; el navegador hace interactiva l
 4. La sala `/subastas/[id]` carga el producto, el perfil del vendedor y las pujas recientes desde el servidor.
 5. En la sala, el cliente abre un canal Realtime filtrado para ese producto. Los INSERT de `bids` actualizan el historial y el monto; los UPDATE de `products` sincronizan la puja actual y el vencimiento.
 6. Para registrar una oferta, el cliente llama a la función RPC transaccional `place_bid`. No se insertan filas en `bids` directamente desde el navegador.
+7. En la primera puja válida, la misma transacción retiene el 10% del precio base como garantía; las siguientes pujas de esa persona en la subasta no vuelven a cobrarla.
+8. Al finalizar la subasta, `settle_auction_guarantees` devuelve las garantías de los participantes que no ganaron y aplica la del ganador al precio final. El saldo pendiente del ganador es el precio final menos la garantía aplicada.
 
 ## Modelo de datos
 
@@ -134,9 +136,9 @@ La sala muestra la galería, descripción, condición, vendedor, oferta vigente,
 
 El hook [useSynchronizedTimer.ts](../apps/web/hooks/useSynchronizedTimer.ts) sincroniza la hora con la RPC `public.get_server_time()` (milisegundos desde Unix epoch) y calcula el contador con un reloj monotónico local compensado por la diferencia estimada con el servidor. Reintenta la sincronización cada 30 segundos y recalcula el vencimiento al cambiar `auction_ends_at` por Realtime. Mientras no haya una sincronización válida, muestra un skeleton y mantiene deshabilitadas las pujas. Dentro de los últimos 180 segundos muestra la zona anti-sniping; al llegar a cero, cierra el formulario y presenta el ganador actual.
 
-La regla de límites también debe estar protegida en PostgreSQL. El diseño descrito para el sistema usa una validación `BEFORE INSERT` en `public.bids` que verifica la subasta, el incremento y el máximo, y bloquea la fila del producto para evitar que dos pujas simultáneas validen contra el mismo estado antiguo. La validación del navegador mejora la experiencia, pero no sustituye esta protección de base de datos.
+La regla de límites también debe estar protegida en PostgreSQL. La RPC `place_bid` bloquea la fila del producto, comprueba los límites y reserva la garantía y la puja en una sola transacción. La validación del navegador mejora la experiencia, pero no sustituye esta protección de base de datos.
 
-**Importante:** el directorio `supabase/migrations/` de este checkout está vacío. Por eso no es posible revisar aquí el SQL de esa validación ni confirmar que esté desplegada en Supabase. Antes de operar o publicar cambios, verifica la función, el trigger y sus permisos en el proyecto Supabase; conviene guardar el SQL en una migración versionada del repositorio.
+La migración [`20261127160000_auction_guarantees.sql`](../supabase/migrations/20261127160000_auction_guarantees.sql) versiona la reserva y liquidación de garantías. Cuando `pg_cron` está habilitado, la migración programa la liquidación en segundo plano cada minuto; la web también la invoca cuando una sala llega a cero o se abre después del cierre. Verifica los triggers preexistentes de pujas y anti-sniping en el proyecto Supabase antes de desplegar.
 
 ### Protección anti-sniping
 

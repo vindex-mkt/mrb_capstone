@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Dialog } from "@base-ui/react/dialog";
-import { ArrowDownToLine, ArrowUpFromLine, Check, CreditCard, LockKeyhole, ShieldCheck } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, CreditCard, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconArrowRight, IconWallet } from "@/components/icons";
 import { useWallet } from "@/hooks/useWallet";
+import { MAX_WALLET_TOPUP_AMOUNT, startWalletTopup } from "@/lib/wallet";
 
 const formatCLP = (amount: number) =>
   new Intl.NumberFormat("es-CL", {
@@ -16,39 +18,56 @@ const formatCLP = (amount: number) =>
   }).format(amount);
 
 export default function WalletPage() {
+  const router = useRouter();
   const { userId, balances, loading, error } = useWallet();
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("10000");
-  const [paymentMethod, setPaymentMethod] = useState<"webpay" | "mercadopago">("webpay");
   const [depositProcessing, setDepositProcessing] = useState(false);
-  const [depositComplete, setDepositComplete] = useState(false);
   const [depositError, setDepositError] = useState<string | null>(null);
   const parsedDepositAmount = Number(depositAmount);
-  const validDepositAmount = Number.isSafeInteger(parsedDepositAmount) && parsedDepositAmount > 0;
+  const validDepositAmount = Number.isSafeInteger(parsedDepositAmount)
+    && parsedDepositAmount > 0
+    && parsedDepositAmount <= MAX_WALLET_TOPUP_AMOUNT;
 
   const openDeposit = () => {
     setDepositAmount("10000");
-    setPaymentMethod("webpay");
     setDepositError(null);
-    setDepositComplete(false);
     setDepositOpen(true);
   };
 
+  useEffect(() => {
+    const openDepositFromHash = () => {
+      if (window.location.hash !== "#depositar") return;
+      setDepositAmount("10000");
+      setDepositError(null);
+      setDepositOpen(true);
+    };
+
+    openDepositFromHash();
+    window.addEventListener("hashchange", openDepositFromHash);
+    return () => window.removeEventListener("hashchange", openDepositFromHash);
+  }, []);
+
   const handleDeposit = async () => {
     if (depositProcessing) return;
+    if (!userId) {
+      setDepositError("Inicia sesión para ingresar saldo a tu billetera.");
+      return;
+    }
     if (!validDepositAmount) {
-      setDepositError("Ingresa un monto válido en pesos chilenos.");
+      setDepositError(`Ingresa un monto entero entre $1 y ${formatCLP(MAX_WALLET_TOPUP_AMOUNT)}.`);
       return;
     }
 
     setDepositError(null);
     setDepositProcessing(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 900));
-      setDepositComplete(true);
-    } catch {
-      setDepositError("No se pudo completar la simulación de pago. Intenta nuevamente.");
-    } finally {
+      const reviewPath = await startWalletTopup(parsedDepositAmount);
+      if (reviewPath) router.push(reviewPath);
+    } catch (error) {
+      setDepositError(error instanceof Error
+        ? error.message
+        : "No se pudo iniciar el pago con Transbank. Intenta nuevamente.");
       setDepositProcessing(false);
     }
   };
@@ -67,7 +86,7 @@ export default function WalletPage() {
                 Mi billetera
               </h1>
               <p className="mt-2 max-w-xl text-sm leading-6 text-brand-100 sm:text-base">
-                Consulta tus saldos simulados, garantías y entregas en custodia. No representan dinero real ni permiten retiros.
+                Consulta tu saldo, garantías y entregas en custodia. Las recargas usan Webpay Plus en ambiente de integración.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -115,7 +134,7 @@ export default function WalletPage() {
                     <p className="mt-3 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
                       {loading ? "Cargando..." : error ? "No disponible" : balances ? formatCLP(balances.available) : "—"}
                     </p>
-                    <p className="mt-2 text-sm text-muted-foreground">Simulación de integración; no retirable</p>
+                    <p className="mt-2 text-sm text-muted-foreground">Créditos CLP de integración; no retirable</p>
                   </div>
                   <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-700">
                     <IconWallet className="h-6 w-6" />
@@ -211,8 +230,7 @@ export default function WalletPage() {
             </span>
             <h2 className="mt-4 text-xl font-bold text-foreground">Ingresar saldo</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Las recargas mediante transferencia o pasarela de pago todavía no están conectadas a la plataforma.
-              No se realizará ningún cobro desde esta página.
+              Paga con Webpay Plus. El saldo se abonará solo cuando Transbank confirme el pago.
             </p>
             <button type="button" onClick={openDeposit} className="btn btn-primary mt-5 min-h-11 px-5">
               Ingresar saldo
@@ -253,34 +271,19 @@ export default function WalletPage() {
       <Dialog.Root
         open={depositOpen}
         onOpenChange={(open) => {
-          if (!depositProcessing) setDepositOpen(open);
+          if (depositProcessing) return;
+          setDepositOpen(open);
+          if (!open && window.location.hash === "#depositar") {
+            const url = new URL(window.location.href);
+            url.hash = "";
+            window.history.replaceState(window.history.state, "", url);
+          }
         }}
       >
         <Dialog.Portal>
           <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
           <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 space-y-4 overflow-y-auto rounded-2xl border border-border bg-surface p-5 text-foreground shadow-xl sm:p-6">
-            {depositComplete ? (
-              <>
-                <div className="flex items-start gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700">
-                    <Check className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <div className="space-y-1">
-                    <Dialog.Title className="text-lg font-semibold">Simulación completada</Dialog.Title>
-                    <Dialog.Description className="text-sm text-muted-foreground">
-                      La recarga de {formatCLP(parsedDepositAmount)} se simuló con {paymentMethod === "webpay" ? "Webpay Plus" : "Mercado Pago"}.
-                    </Dialog.Description>
-                  </div>
-                </div>
-                <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
-                  No se realizó un cobro real ni se abonó saldo a tu billetera. La integración de recargas aún está pendiente.
-                </p>
-                <div className="flex justify-end">
-                  <Button type="button" onClick={() => setDepositOpen(false)}>Entendido</Button>
-                </div>
-              </>
-            ) : (
-              <>
+            <>
                 <div className="flex items-start gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700">
                     <CreditCard className="h-5 w-5" aria-hidden="true" />
@@ -288,7 +291,7 @@ export default function WalletPage() {
                   <div className="space-y-1">
                     <Dialog.Title className="text-lg font-semibold">Ingresar saldo</Dialog.Title>
                     <Dialog.Description className="text-sm text-muted-foreground">
-                      Pago simulado: no se solicitarán datos de tarjeta ni se realizará un cobro real.
+                      Serás redirigido a Transbank Webpay Plus para autorizar el pago.
                     </Dialog.Description>
                   </div>
                 </div>
@@ -301,6 +304,7 @@ export default function WalletPage() {
                     id="wallet-deposit-amount"
                     type="number"
                     min="1"
+                    max={MAX_WALLET_TOPUP_AMOUNT}
                     step="1"
                     inputMode="numeric"
                     value={depositAmount}
@@ -314,44 +318,8 @@ export default function WalletPage() {
                   />
                 </div>
 
-                <fieldset className="space-y-2">
-                  <legend className="text-sm font-medium text-foreground">Medio de pago</legend>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/70">
-                      <input
-                        type="radio"
-                        name="wallet-payment"
-                        value="webpay"
-                        checked={paymentMethod === "webpay"}
-                        onChange={() => setPaymentMethod("webpay")}
-                        className="accent-brand-600"
-                        disabled={depositProcessing}
-                      />
-                      <span>
-                        <span className="block font-semibold text-foreground">Webpay Plus</span>
-                        <span className="text-xs text-muted-foreground">Transbank · Simulado</span>
-                      </span>
-                    </label>
-                    <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50/70">
-                      <input
-                        type="radio"
-                        name="wallet-payment"
-                        value="mercadopago"
-                        checked={paymentMethod === "mercadopago"}
-                        onChange={() => setPaymentMethod("mercadopago")}
-                        className="accent-brand-600"
-                        disabled={depositProcessing}
-                      />
-                      <span>
-                        <span className="block font-semibold text-foreground">Mercado Pago</span>
-                        <span className="text-xs text-muted-foreground">Simulado</span>
-                      </span>
-                    </label>
-                  </div>
-                </fieldset>
-
                 <div className="flex justify-between gap-3 rounded-xl border border-border bg-muted/40 p-3 text-sm">
-                  <span className="font-semibold text-foreground">Total de la simulación</span>
+                  <span className="font-semibold text-foreground">Total a pagar</span>
                   <span className="font-extrabold text-foreground">
                     {validDepositAmount ? formatCLP(parsedDepositAmount) : "—"}
                   </span>
@@ -363,16 +331,19 @@ export default function WalletPage() {
                   </p>
                 )}
 
+                <p className="text-xs leading-5 text-muted-foreground">
+                  El saldo se acreditará únicamente tras confirmar el pago autorizado por Transbank.
+                </p>
+
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                   <Button type="button" variant="outline" onClick={() => setDepositOpen(false)} disabled={depositProcessing}>
                     Cancelar
                   </Button>
-                  <Button type="button" onClick={() => void handleDeposit()} disabled={depositProcessing || !validDepositAmount}>
-                    {depositProcessing ? "Procesando pago..." : `Simular recarga de ${validDepositAmount ? formatCLP(parsedDepositAmount) : "saldo"}`}
+                  <Button type="button" onClick={() => void handleDeposit()} disabled={depositProcessing || !validDepositAmount || !userId}>
+                    {depositProcessing ? "Conectando con Transbank..." : `Pagar ${validDepositAmount ? formatCLP(parsedDepositAmount) : "saldo"} con Webpay`}
                   </Button>
                 </div>
-              </>
-            )}
+            </>
           </Dialog.Popup>
         </Dialog.Portal>
       </Dialog.Root>

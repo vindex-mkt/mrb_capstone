@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   getAuctionAntiSnipingConfig,
   formatAuctionAmount,
+  getAuctionGuaranteeAmount,
   getAuctionBidLimits,
   getProductImage,
   type AuctionBid,
@@ -65,12 +66,17 @@ export default function AuctionRoom({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bidError, setBidError] = useState<string | null>(null);
   const [bidMessage, setBidMessage] = useState<string | null>(null);
+  const [guaranteeAccepted, setGuaranteeAccepted] = useState(false);
+  const [settlementMessage, setSettlementMessage] = useState<string | null>(null);
+  const [settlementError, setSettlementError] = useState<string | null>(null);
+  const [settlingGuarantees, setSettlingGuarantees] = useState(false);
   const [winnerName, setWinnerName] = useState(initialWinnerName);
   const [winnerError, setWinnerError] = useState<string | null>(null);
   const bidLimits = useMemo(() => getAuctionBidLimits(product), [product]);
   const minimumBid = bidLimits?.minimum ?? null;
   const maximumBid = bidLimits?.maximum ?? null;
   const currentAmount = product.current_bid ?? product.starting_price;
+  const guaranteeAmount = getAuctionGuaranteeAmount(product.starting_price);
   const isClosed = isExpired;
   const canPlaceBids = isSynced && totalSeconds !== null && totalSeconds > 0;
   const antiSnipingConfig = getAuctionAntiSnipingConfig(product);
@@ -145,6 +151,64 @@ export default function AuctionRoom({
   }, [initialProduct.winner_id, initialWinnerName, product.winner_id, supabase]);
 
   useEffect(() => {
+    if (!isExpired || !currentUserId) return;
+
+    let isCurrent = true;
+    const settleGuarantees = async () => {
+      setSettlingGuarantees(true);
+      setSettlementError(null);
+      try {
+        const { data, error } = await supabase.rpc("settle_auction_guarantees", {
+          p_auction_id: product.id,
+        });
+        if (error) throw error;
+
+        const result = typeof data === "object" && data !== null
+          ? data as Record<string, unknown>
+          : null;
+        if (!result || result.success !== true) {
+          throw new Error(
+            typeof result?.message === "string"
+              ? result.message
+              : "La base de datos no confirmó la liquidación de garantías.",
+          );
+        }
+
+        if (!isCurrent) return;
+        window.dispatchEvent(new Event("vindex:wallet-updated"));
+        if (result.user_guarantee_applied === true) {
+          const amountDue = Number(result.amount_due);
+          const settledGuaranteeAmount = Number(result.user_guarantee_amount ?? guaranteeAmount);
+          setSettlementMessage(
+            Number.isSafeInteger(amountDue)
+              ? `La garantía de ${formatAuctionAmount(settledGuaranteeAmount)} se aplicó al precio. Saldo pendiente: ${formatAuctionAmount(amountDue)}.`
+              : "Tu garantía se aplicó al precio final de la subasta.",
+          );
+        } else if (result.user_guarantee_released === true) {
+          const settledGuaranteeAmount = Number(result.user_guarantee_amount ?? guaranteeAmount);
+          setSettlementMessage(
+            `La subasta finalizó. Tu garantía de ${formatAuctionAmount(settledGuaranteeAmount)} volvió a tu saldo disponible.`,
+          );
+        } else {
+          setSettlementMessage("La subasta finalizó; no había una garantía pendiente para liquidar.");
+        }
+      } catch (error) {
+        if (!isCurrent) return;
+        const message = error instanceof Error ? error.message : "Error desconocido";
+        console.error("No se pudieron liquidar las garantías de la subasta:", error);
+        setSettlementError(`No se pudo liquidar la garantía: ${message}`);
+      } finally {
+        if (isCurrent) setSettlingGuarantees(false);
+      }
+    };
+
+    void settleGuarantees();
+    return () => {
+      isCurrent = false;
+    };
+  }, [currentUserId, guaranteeAmount, isExpired, product.id, supabase]);
+
+  useEffect(() => {
     if (bidLimits === null) {
       setBidAmount("");
       return;
@@ -171,6 +235,11 @@ export default function AuctionRoom({
       return;
     }
 
+    if (!guaranteeAccepted) {
+      setBidError("Confirma la retención de la garantía para participar en esta subasta.");
+      return;
+    }
+
     if (
       !Number.isSafeInteger(amount) ||
       bidLimits === null ||
@@ -191,11 +260,23 @@ export default function AuctionRoom({
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.rpc("place_bid", {
+      const { data, error } = await supabase.rpc("place_bid", {
         p_product_id: product.id,
         p_bid_amount: amount,
       });
       if (error) throw error;
+      const result = typeof data === "object" && data !== null
+        ? data as Record<string, unknown>
+        : null;
+      if (!result || result.success !== true) {
+        throw new Error(
+          typeof result?.message === "string"
+            ? result.message
+            : "La base de datos no confirmó la puja.",
+        );
+      }
+      window.dispatchEvent(new Event("vindex:wallet-updated"));
+      setGuaranteeAccepted(true);
       const wasInAntiSnipingWindow = isSynced &&
         totalSeconds !== null &&
         totalSeconds <= antiSnipingWindowSeconds;
@@ -211,7 +292,11 @@ export default function AuctionRoom({
       ) {
         setBidError("La puja se confirmó, pero Supabase no extendió el cierre. Revisa el trigger anti-sniping de la base de datos.");
       } else {
-        setBidMessage("Puja confirmada y estado de la subasta sincronizado.");
+        setBidMessage(
+          result.guarantee_locked === true
+            ? `Puja confirmada. Se retuvo una garantía de ${formatAuctionAmount(guaranteeAmount)}.`
+            : "Puja confirmada. Tu garantía ya estaba retenida para esta subasta.",
+        );
       }
     } catch (error) {
       const errorData = typeof error === "object" && error !== null
@@ -376,6 +461,17 @@ export default function AuctionRoom({
                       : "No se registró un ganador para esta subasta."}
                   </p>
                   {winnerError && <p role="alert" className="mt-1 text-sm text-destructive">{winnerError}</p>}
+                  {settlingGuarantees && (
+                    <p role="status" className="mt-2 text-sm text-muted-foreground">
+                      Liquidando las garantías de la subasta...
+                    </p>
+                  )}
+                  {settlementMessage && (
+                    <p role="status" className="mt-2 text-sm text-emerald-800">{settlementMessage}</p>
+                  )}
+                  {settlementError && (
+                    <p role="alert" className="mt-2 text-sm text-destructive">{settlementError}</p>
+                  )}
                 </div>
               ) : !isSynced ? (
                 <p role="status" className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
@@ -388,6 +484,29 @@ export default function AuctionRoom({
               ) : (
                 <form onSubmit={submitBid} className="space-y-4">
                   <fieldset disabled={!currentUserId || isSubmitting || bidLimits === null || !canPlaceBids} className="space-y-4">
+                    {guaranteeAmount !== null && (
+                      <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/70 p-4">
+                        <p className="text-sm leading-6 text-foreground">
+                          Para participar se retendrá una garantía del 10% del precio base:
+                          {" "}<strong>{formatAuctionAmount(guaranteeAmount)}</strong>.
+                          Se reserva una sola vez por subasta y se libera o aplica al precio al finalizar.
+                        </p>
+                        <Link href="/wallet#depositar" className="text-sm font-semibold text-brand-700 hover:text-brand-800">
+                          Revisar mi billetera o ingresar saldo
+                        </Link>
+                        <label className="flex items-start gap-2 text-sm text-foreground">
+                          <input
+                            type="checkbox"
+                            checked={guaranteeAccepted}
+                            onChange={(event) => setGuaranteeAccepted(event.target.checked)}
+                            className="mt-1 accent-brand-600"
+                          />
+                          <span>
+                            Acepto la retención de {formatAuctionAmount(guaranteeAmount)} para participar.
+                          </span>
+                        </label>
+                      </div>
+                    )}
                     <div>
                       <label htmlFor="bid-amount" className="mb-2 block text-sm font-medium text-foreground">
                         Tu oferta (CLP)
@@ -422,7 +541,11 @@ export default function AuctionRoom({
                         );
                       })}
                     </div>
-                    <Button type="submit" className="h-11 w-full" disabled={isSubmitting}>
+                    <Button
+                      type="submit"
+                      className="h-11 w-full"
+                      disabled={isSubmitting || (guaranteeAmount !== null && !guaranteeAccepted)}
+                    >
                       {isSubmitting ? "Confirmando puja..." : "Confirmar puja"}
                     </Button>
                   </fieldset>
