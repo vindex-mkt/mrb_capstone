@@ -21,7 +21,18 @@ export default async function AuctionPage({ params }: { params: Promise<{ id: st
   if (isClosed) {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user || user.id !== product.seller_id) notFound();
+    if (!user) notFound();
+    if (user.id !== product.seller_id) {
+      const { data: userBid, error } = await supabase
+        .from("bids")
+        .select("id")
+        .eq("product_id", product.id)
+        .eq("bidder_id", user.id)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!userBid) notFound();
+    }
   }
 
   const [bids, winnerName] = await Promise.all([

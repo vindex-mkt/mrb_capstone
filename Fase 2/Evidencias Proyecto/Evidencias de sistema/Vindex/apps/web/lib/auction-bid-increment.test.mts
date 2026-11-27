@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateAuctionBidIncrement } from "./auction-bid-increment.ts";
-import { getAuctionBidLimits } from "./product-utils.ts";
+import {
+  getAuctionBidLimits,
+  getAuctionGuaranteeAmount,
+} from "./product-utils.ts";
 
 test("uses the minimum CLP increment for non-positive reference amounts", () => {
   assert.equal(calculateAuctionBidIncrement(0), 100);
@@ -52,4 +55,15 @@ test("allows a seller-selected increment above the calculated minimum", () => {
   });
 
   assert.deepEqual(limits, { minimum: 102_000, maximum: 150_000 });
+});
+
+test("calculates the 10% auction guarantee from the starting price", () => {
+  assert.equal(getAuctionGuaranteeAmount(100_000), 10_000);
+  assert.equal(getAuctionGuaranteeAmount(1), 1);
+});
+
+test("rejects invalid auction starting prices for guarantee calculation", () => {
+  assert.equal(getAuctionGuaranteeAmount(null), null);
+  assert.equal(getAuctionGuaranteeAmount(0), null);
+  assert.equal(getAuctionGuaranteeAmount(1.5), null);
 });
