@@ -99,12 +99,18 @@ La consulta de pujas carga el nombre mediante la relación explícita `profiles:
 En [la página de venta](../apps/web/app/vender/page.tsx), el vendedor activa **Publicar como subasta** y completa:
 
 - Precio inicial (`starting_price`), expresado como pesos enteros y mayor que cero.
-- Incremento mínimo (`bid_increment`), positivo y no superior al 50% del precio inicial. Así queda espacio para aceptar la siguiente puja dentro del límite.
+- Incremento (`bid_increment`), que no puede ser inferior al mínimo calculado automáticamente desde el precio inicial y redondeado hacia arriba al tramo correspondiente:
+  - Hasta $50.000: 1%, en múltiplos de $100 y con piso de $100.
+  - $50.001–$250.000: 0,8%, en múltiplos de $500 y con piso de $500.
+  - $250.001–$1.000.000: 0,5%, en múltiplos de $1.000 y con piso de $1.000.
+  - $1.000.001–$3.000.000: 0,3%, en múltiplos de $1.000 y con piso de $3.000.
+  - Más de $3.000.000: 0,2%, en múltiplos de $5.000 y con piso de $5.000.
+  - Un monto de referencia igual o inferior a cero produce el piso de $100.
 - Duración (1 minuto para demostración, 5 minutos para pruebas, 24 o 48 horas, 7 o 14 días); de ella se calcula `auction_ends_at`.
 - La opción "1 minuto (demostración)" configura `auction_mode = 'demo'`.
 - Stock, condición, descripción, imágenes y disponibilidad de envío.
 
-Al guardar se crea la fila en `products` con `sale_type = 'auction'`, `is_auction = true`, `current_bid = NULL` y `winner_id = NULL`. El canal no se crea durante la publicación ni en el catálogo.
+La interfaz propone el mínimo calculado y permite al vendedor aumentarlo; no permite definir un incremento menor. PostgreSQL aplica la misma regla al insertar o modificar una subasta, incluso si se omite o manipula el valor desde el cliente. La migración `supabase/migrations/20261127010000_auction_bid_increment.sql` agregó el cálculo y la validación; `supabase/migrations/20261127020000_auction_bid_increment_minimum.sql` permite incrementos mayores y ajusta solo valores inferiores al mínimo, preservando los superiores. Al guardar se crea la fila en `products` con `sale_type = 'auction'`, `is_auction = true`, `current_bid = NULL` y `winner_id = NULL`. El canal no se crea durante la publicación ni en el catálogo.
 
 ## Catálogo
 
@@ -124,7 +130,7 @@ La ruta [app/subastas/[id]/page.tsx](../apps/web/app/subastas/[id]/page.tsx):
 4. Carga el nombre del ganador, cuando ya existe.
 5. Entrega esos datos a [AuctionRoom.tsx](../apps/web/components/auctions/AuctionRoom.tsx).
 
-La sala muestra la galería, descripción, condición, vendedor, oferta vigente, rango permitido para la siguiente puja, tiempo restante y pujas recientes. El mínimo se calcula como `current_bid + bid_increment`; si aún no hay ofertas, se usa `starting_price`. El máximo es `floor(monto vigente × 1,5)`; antes de la primera puja, el monto vigente es `starting_price`. Por ejemplo, si el monto vigente es $500.000, una puja de $6.000.000.000 se rechaza y el tope de ese turno es $750.000. Los límites se recalculan al recibir cambios por Realtime. Una puja solo se acepta dentro del rango inclusivo; los botones de puja rápida que superen el máximo se deshabilitan.
+La sala muestra la galería, descripción, condición, vendedor, oferta vigente, rango permitido para la siguiente puja, tiempo restante y pujas recientes. El mínimo se calcula como `current_bid + bid_increment`; si aún no hay ofertas, se usa `starting_price`. El máximo es `floor(monto vigente × 1,5)`; antes de la primera puja, el monto vigente es `starting_price`. Si ese máximo quedara por debajo del mínimo obligatorio, se permite pujar exactamente desde el mínimo. Por ejemplo, si el monto vigente es $500.000, una puja de $6.000.000.000 se rechaza y el tope de ese turno es $750.000. Los límites se recalculan al recibir cambios por Realtime. Una puja solo se acepta dentro del rango inclusivo; los botones de puja rápida que superen el máximo se deshabilitan.
 
 El hook [useSynchronizedTimer.ts](../apps/web/hooks/useSynchronizedTimer.ts) sincroniza la hora con la RPC `public.get_server_time()` (milisegundos desde Unix epoch) y calcula el contador con un reloj monotónico local compensado por la diferencia estimada con el servidor. Reintenta la sincronización cada 30 segundos y recalcula el vencimiento al cambiar `auction_ends_at` por Realtime. Mientras no haya una sincronización válida, muestra un skeleton y mantiene deshabilitadas las pujas. Dentro de los últimos 180 segundos muestra la zona anti-sniping; al llegar a cero, cierra el formulario y presenta el ganador actual.
 
@@ -179,7 +185,7 @@ El hook registra el estado de suscripción (`SUBSCRIBED`, `CHANNEL_ERROR`, `TIME
 - `public.products` y `public.bids` deben estar en la publicación `supabase_realtime`.
 - Debe existir la RPC transaccional `public.place_bid` con parámetros `p_product_id` y `p_bid_amount`.
 - Debe existir `public.get_server_time()` y devolver la hora actual del servidor como milisegundos desde Unix epoch; los clientes de la sala necesitan permiso para ejecutarla.
-- La RPC `place_bid` debe aplicar las reglas de negocio en PostgreSQL; el SQL de esa RPC y de los triggers de validación no está versionado en el directorio `supabase/migrations/` de este checkout, por lo que su despliegue debe comprobarse directamente en Supabase.
+- Las migraciones `20261127010000_auction_bid_increment.sql` y `20261127020000_auction_bid_increment_minimum.sql` versionan el cálculo mínimo, la persistencia del incremento elegido por el vendedor y la validación del rango de puja. La RPC transaccional `place_bid` y sus otros triggers de sincronización/anti-sniping deben existir en Supabase según el contrato descrito en este documento.
 - Debe existir la clave foránea `fk_bids_profiles` de `bids.bidder_id` a `profiles.id`, además de la relación existente `fk_products_profiles` para el vendedor.
 - Las políticas RLS deben permitir al usuario consultar subastas y pujas que corresponden a la experiencia pública, leer los perfiles necesarios y ejecutar la RPC según las reglas del negocio.
 - En una tabla protegida por RLS, Realtime solo entrega al cliente eventos para los que la sesión cumple las políticas de lectura aplicables.
@@ -222,7 +228,7 @@ Piensa en cada archivo como una pieza con una responsabilidad concreta. Las pág
 ### Recorrido de publicación
 
 1. El vendedor abre `/vender`. La página consulta la sesión y solo muestra el formulario cuando hay un usuario autenticado.
-2. Al enviar, el navegador valida los campos. Para una subasta exige precio inicial entero mayor que cero, incremento entero positivo de hasta el 50% del precio inicial y una duración permitida.
+2. Al enviar, el navegador valida los campos. Para una subasta exige precio inicial entero mayor que cero, un incremento entero igual o superior al mínimo calculado y una duración permitida.
 3. El navegador inserta una fila en `products`. Guarda `sale_type = 'auction'`, `is_auction = true`, `starting_price`, `bid_increment` y `auction_ends_at`; `current_bid` y `winner_id` comienzan en `NULL`.
 4. Con el ID que devuelve el INSERT, convierte las imágenes a WebP, las sube a Supabase Storage y guarda sus URLs públicas en `products.images`.
 5. El catálogo consulta las filas activas cuyo cierre todavía no ha llegado. No necesita escuchar cambios segundo a segundo: al cargar o actualizar la página vuelve a consultar.

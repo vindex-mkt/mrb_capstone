@@ -75,8 +75,7 @@ export const getAuctionBidLimits = (
 		referenceAmount <= 0 ||
 		typeof increment !== "number" ||
 		!Number.isSafeInteger(increment) ||
-		increment <= 0 ||
-		increment > Math.floor(startingPrice * 0.5)
+		increment <= 0
 	) {
 		return null;
 	}
@@ -84,7 +83,7 @@ export const getAuctionBidLimits = (
 	const minimum = product.current_bid === null
 		? referenceAmount
 		: referenceAmount + increment;
-	const maximum = Math.floor(referenceAmount * 1.5);
+	const maximum = Math.max(Math.floor(referenceAmount * 1.5), minimum);
 	if (!Number.isSafeInteger(minimum) || !Number.isSafeInteger(maximum) || minimum > maximum) {
 		return null;
 	}

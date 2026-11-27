@@ -89,7 +89,7 @@ Los campos principales del modelo son:
 - Tipo de temporización: `auction_mode` (`standard` o `demo`).
 - Propiedad: `seller_id` y, cuando corresponde, `store_id`.
 
-Las pujas se registran en `bids`. El cliente no debe insertar pujas directamente: debe invocar la RPC transaccional `place_bid`, respaldada por validaciones y triggers de PostgreSQL. La hora del servidor se obtiene mediante `get_server_time`.
+Las pujas se registran en `bids`. `bid_increment` debe ser al menos el valor que calcula `calculate_auction_bid_increment()` desde `starting_price`; el vendedor puede elegir un monto mayor. El trigger de `products` impone ese piso. Las migraciones `supabase/migrations/20261127010000_auction_bid_increment.sql` y `supabase/migrations/20261127020000_auction_bid_increment_minimum.sql` mantienen esta regla y actualizan subastas existentes sin reducir incrementos superiores. El cliente no debe insertar pujas directamente: debe invocar la RPC transaccional `place_bid`, respaldada por validaciones y triggers de PostgreSQL. La hora del servidor se obtiene mediante `get_server_time`.
 
 ## Carrito y órdenes
 

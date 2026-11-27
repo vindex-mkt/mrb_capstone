@@ -21,6 +21,7 @@ import { useToast } from "@/components/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import { featuredPlans, startAdvertisingPayment } from "@/lib/advertising";
 import { analyzeProductTextForModeration } from "@/lib/moderation";
+import { calculateAuctionBidIncrement } from "@/lib/auction-bid-increment";
 
 type SelectedImage = {
 	file: File;
@@ -223,7 +224,7 @@ export default function SellProductPage() {
 	const [description, setDescription] = useState("");
 	const [price, setPrice] = useState("");
 	const [startingPrice, setStartingPrice] = useState("");
-	const [bidIncrement, setBidIncrement] = useState("5000");
+	const [bidIncrement, setBidIncrement] = useState("");
 	const [auctionDurationHours, setAuctionDurationHours] = useState("24");
 	const [discountPrice, setDiscountPrice] = useState("");
 	const [offerDurationHours, setOfferDurationHours] = useState("24");
@@ -259,23 +260,32 @@ export default function SellProductPage() {
 	const parsedPrice = parseClpInput(price);
 	const parsedStartingPrice = parseClpInput(startingPrice);
 	const parsedBidIncrement = parseClpInput(bidIncrement);
+	const calculatedBidIncrement = parsedStartingPrice === null
+		? null
+		: calculateAuctionBidIncrement(parsedStartingPrice);
 	const parsedDiscountPrice = discountPrice.trim() ? parseClpInput(discountPrice) : null;
 	const activePrice = isAuction ? parsedStartingPrice : parsedPrice;
 	const formattedPrice = activePrice !== null ? formatClp(activePrice) : "Precio por definir";
+	useEffect(() => {
+		if (calculatedBidIncrement === null) return;
+
+		setBidIncrement((currentValue) => {
+			const currentIncrement = parseClpInput(currentValue);
+			return currentIncrement === null || currentIncrement < calculatedBidIncrement
+				? String(calculatedBidIncrement)
+				: currentValue;
+		});
+	}, [calculatedBidIncrement]);
 	const invalidPrice = !isAuction && (
 		price.trim() === "" || parsedPrice === null || parsedPrice < 0
 	);
-	const maximumBidIncrement = parsedStartingPrice !== null && parsedStartingPrice > 0
-		? Math.floor(parsedStartingPrice * 0.5)
-		: null;
 	const invalidAuctionTerms = isAuction && (
 		startingPrice.trim() === "" ||
 		parsedStartingPrice === null ||
 		parsedStartingPrice <= 0 ||
+		calculatedBidIncrement === null ||
 		parsedBidIncrement === null ||
-		parsedBidIncrement <= 0 ||
-		maximumBidIncrement === null ||
-		parsedBidIncrement > maximumBidIncrement ||
+		parsedBidIncrement < calculatedBidIncrement ||
 		!["0.016666666666666666", "0.08333333333333333", "24", "48", "168", "336"].includes(auctionDurationHours)
 	);
 	const invalidStock = stock.trim() === "" ||
@@ -437,9 +447,10 @@ export default function SellProductPage() {
 
 		if (invalidAuctionTerms) {
 			setErrorMessage(
-				maximumBidIncrement !== null && parsedBidIncrement !== null && parsedBidIncrement > maximumBidIncrement
-					? `El incremento mínimo no puede superar ${new Intl.NumberFormat("es-CL").format(maximumBidIncrement)} CLP (50% del precio inicial).`
-					: "Ingresa un precio inicial y un incremento positivos en pesos enteros, y una duración válida para la subasta.",
+				calculatedBidIncrement !== null &&
+					(parsedBidIncrement === null || parsedBidIncrement < calculatedBidIncrement)
+					? `El incremento mínimo debe ser al menos ${formatClp(calculatedBidIncrement)}. Puedes definir uno mayor.`
+					: "Ingresa un precio inicial entero positivo y una duración válida para la subasta.",
 			);
 			return;
 		}
@@ -511,7 +522,7 @@ export default function SellProductPage() {
 				is_auction: isAuction,
 				starting_price: isAuction ? parseClpInput(startingPrice) : null,
 				current_bid: null,
-				bid_increment: isAuction ? parseClpInput(bidIncrement) : null,
+				bid_increment: isAuction ? parsedBidIncrement : null,
 				auction_ends_at: isAuction
 					? new Date(now.getTime() + Number(auctionDurationHours) * 60 * 60 * 1000).toISOString()
 					: null,
@@ -579,7 +590,7 @@ export default function SellProductPage() {
 			setDescription("");
 			setPrice("");
 			setStartingPrice("");
-			setBidIncrement("5000");
+			setBidIncrement("");
 			setAuctionDurationHours("24");
 			setDiscountPrice("");
 			setOfferDurationHours("24");
@@ -724,10 +735,9 @@ export default function SellProductPage() {
 										<div className="grid gap-4 sm:grid-cols-2">
 											<div className="space-y-2">
 												<Label htmlFor="bidIncrement">Incremento mínimo (CLP)</Label>
-												<Input id="bidIncrement" type="text" inputMode="numeric" pattern="[0-9.]*" value={bidIncrement} onChange={(event) => setBidIncrement(keepDigits(event.target.value))} onBlur={() => setBidIncrement(formatClpInput(bidIncrement))} required />
+												<Input id="bidIncrement" type="text" inputMode="numeric" pattern="[0-9.]*" value={bidIncrement} onChange={(event) => setBidIncrement(keepDigits(event.target.value))} onBlur={() => setBidIncrement(formatClpInput(bidIncrement))} required aria-invalid={calculatedBidIncrement !== null && parsedBidIncrement !== null && parsedBidIncrement < calculatedBidIncrement} />
 												<p className="text-xs text-muted-foreground">
-													El incremento no puede superar el 50% del precio inicial
-													{maximumBidIncrement === null ? "." : ` (${new Intl.NumberFormat("es-CL").format(maximumBidIncrement)} CLP).`}
+													Mínimo calculado: {calculatedBidIncrement === null ? "Ingresa el precio inicial" : formatClp(calculatedBidIncrement)}. Puedes definir un incremento mayor, pero no menor.
 												</p>
 											</div>
 											<div className="space-y-2">
@@ -956,7 +966,7 @@ export default function SellProductPage() {
 											<p className="text-xs text-muted-foreground">Precio inicial</p>
 											<p className="text-2xl font-extrabold text-foreground">{formattedPrice}</p>
 											<p className="mt-1 text-sm text-muted-foreground">
-												Incremento: {formatClp(parsedBidIncrement ?? 0)}
+												Incremento: {formatClp(calculatedBidIncrement ?? 0)}
 											</p>
 										</div>
 									) : discountPrice && !invalidDiscountPrice ? (
